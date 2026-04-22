@@ -1,0 +1,568 @@
+================================================================================
+TOPIC: Transformer Architecture
+================================================================================
+The Transformer is a deep learning model architecture introduced in the 2017 paper
+"Attention Is All You Need" by Vaswani et al. It relies entirely on self-attention
+mechanisms to draw global dependencies between input and output, dispensing with
+recurrence and convolutions entirely.
+
+Key components of the Transformer:
+1. Multi-Head Self-Attention: Allows the model to jointly attend to information
+   from different representation subspaces at different positions. Each head
+   computes attention scores using query (Q), key (K), and value (V) matrices.
+   Attention(Q,K,V) = softmax(QK^T / sqrt(d_k)) * V
+
+2. Positional Encoding: Since the Transformer has no recurrence, positional
+   encodings are added to the input embeddings to give the model information
+   about the order of tokens. Sinusoidal encodings are commonly used.
+
+3. Feed-Forward Networks: Each encoder and decoder layer contains a fully
+   connected feed-forward network applied to each position separately.
+
+4. Layer Normalization: Applied before or after each sub-layer.
+
+5. Residual Connections: Each sub-layer has a residual connection around it.
+
+The encoder maps input sequences to continuous representations. The decoder
+generates output sequences autoregressively, attending to both the encoder output
+and previously generated tokens.
+
+================================================================================
+TOPIC: Retrieval Augmented Generation (RAG)
+================================================================================
+Retrieval Augmented Generation (RAG) is a technique that combines a retrieval
+system with a generative language model to produce answers grounded in an
+external knowledge base. Introduced by Lewis et al. (2020) from Facebook AI,
+RAG addresses the problem of LLMs producing outdated or hallucinated information.
+
+RAG Pipeline:
+1. Indexing Phase: Documents are split into chunks, embedded using an embedding
+   model (e.g., text-embedding-ada-002), and stored in a vector database
+   (e.g., FAISS, Pinecone, Chroma, Weaviate).
+
+2. Retrieval Phase: At query time, the query is embedded and cosine similarity
+   (or dot product) is used to retrieve the top-k most relevant chunks.
+
+3. Generation Phase: The retrieved chunks are injected into the LLM prompt as
+   context, and the model generates a response grounded in that context.
+
+Strengths of RAG:
+- Scales to millions of documents
+- Knowledge can be updated without retraining
+- Reduces hallucinations by grounding answers in retrieved text
+
+Weaknesses of RAG:
+- Retrieval errors can cause the model to miss relevant context
+- Multi-hop questions are hard — a single retrieval may miss connections across documents
+- Retrieval adds latency to every query
+- Chunking strategy significantly impacts quality
+- Embedding quality determines retrieval quality
+
+Common chunking strategies:
+- Fixed-size chunking (e.g., 512 tokens with 50-token overlap)
+- Sentence-level chunking
+- Semantic chunking (split on semantic similarity boundaries)
+- Document-level chunking
+
+================================================================================
+TOPIC: Context Augmented Generation (CAG)
+================================================================================
+Context Augmented Generation (CAG) is an alternative to RAG that eliminates the
+retrieval step entirely by preloading the full knowledge base directly into the
+LLM's context window. With modern LLMs supporting context windows of 128K to
+2M tokens, entire knowledge bases can be loaded at inference time.
+
+CAG Pipeline:
+1. Preloading Phase: The entire knowledge base is concatenated and placed into
+   the system prompt or user turn of the LLM's context.
+
+2. KV Cache Precomputation (optional optimization): The key-value cache for the
+   knowledge base tokens is precomputed and stored, allowing subsequent queries
+   to reuse this computation, dramatically reducing per-query latency.
+
+3. Query Phase: Only the user's question is appended; no retrieval needed.
+
+Strengths of CAG:
+- No retrieval errors — the model always sees the full knowledge base
+- Superior multi-hop reasoning — all information is available simultaneously
+- Lower query latency (especially with KV cache)
+- Simpler architecture — no vector database, no embedding model needed
+- More consistent answers (no randomness from retrieval)
+
+Weaknesses of CAG:
+- Context window limits the size of the knowledge base
+- Higher input token cost per query (if no KV cache)
+- Not suitable for very large, dynamic knowledge bases
+- Some models degrade in quality with very long contexts (lost in the middle problem)
+
+CAG vs RAG Decision Guide:
+- Use CAG when: knowledge base fits in context window, static data, need multi-hop
+  reasoning, want simpler architecture, low latency is critical
+- Use RAG when: knowledge base is very large (millions of documents), data changes
+  frequently, cost sensitivity is high
+
+================================================================================
+TOPIC: Large Language Models (LLMs)
+================================================================================
+Large Language Models (LLMs) are neural networks trained on massive text corpora
+to predict the next token in a sequence. Modern LLMs are based on the Transformer
+decoder architecture and are trained using self-supervised learning on internet-
+scale data.
+
+Key milestones:
+- GPT-2 (2019, OpenAI): 1.5B parameters, demonstrated emergent capabilities
+- GPT-3 (2020, OpenAI): 175B parameters, few-shot learning
+- PaLM (2022, Google): 540B parameters, chain-of-thought reasoning
+- ChatGPT (2022, OpenAI): RLHF fine-tuned GPT-3.5, conversational AI
+- GPT-4 (2023, OpenAI): Multimodal, 128K context window
+- Claude 3 (2024, Anthropic): 200K context window, strong reasoning
+- Gemini 1.5 Pro (2024, Google): 1M token context window
+- Llama 3 (2024, Meta): Open-source, 8B and 70B variants
+
+Training techniques:
+1. Pretraining: Next-token prediction on large corpora (CommonCrawl, Books, GitHub)
+2. Supervised Fine-Tuning (SFT): Fine-tune on high-quality instruction-response pairs
+3. RLHF (Reinforcement Learning from Human Feedback): Use human preferences to
+   train a reward model, then optimize the LLM against it using PPO
+4. DPO (Direct Preference Optimization): More stable alternative to RLHF
+
+Context window: The maximum number of tokens an LLM can process in a single
+forward pass. Longer context windows enable CAG, long document QA, and better
+multi-turn conversations.
+
+================================================================================
+TOPIC: Vector Databases and Embeddings
+================================================================================
+Vector databases store high-dimensional vector representations (embeddings) of
+data and support efficient similarity search. They are the backbone of RAG systems.
+
+Popular vector databases:
+- FAISS (Facebook AI Similarity Search): In-memory, open-source, very fast
+- Chroma: Lightweight, easy to use, good for prototyping
+- Pinecone: Managed cloud service, scalable
+- Weaviate: Open-source, supports hybrid search
+- Qdrant: Rust-based, high performance, open-source
+- Milvus: Distributed, production-scale
+
+Embedding models:
+- text-embedding-ada-002 (OpenAI): 1536 dimensions, widely used
+- text-embedding-3-small/large (OpenAI): More efficient, better performance
+- all-MiniLM-L6-v2 (Sentence Transformers): Open-source, fast, 384 dims
+- BGE embeddings (BAAI): State-of-the-art open-source embeddings
+
+Similarity metrics:
+- Cosine similarity: Measures angle between vectors, invariant to magnitude
+- Dot product: Similar to cosine but magnitude-sensitive
+- L2 (Euclidean) distance: Absolute distance in vector space
+
+Approximate Nearest Neighbor (ANN) algorithms:
+- HNSW (Hierarchical Navigable Small World): Default in most vector DBs
+- IVF (Inverted File Index): Partitions space for faster search
+- PQ (Product Quantization): Compresses vectors to reduce memory
+
+================================================================================
+TOPIC: Hallucination in LLMs
+================================================================================
+Hallucination refers to the phenomenon where an LLM generates text that is
+factually incorrect, fabricated, or not grounded in the provided context.
+It is one of the most critical challenges in deploying LLMs in production.
+
+Types of hallucination:
+1. Intrinsic hallucination: The generated output contradicts the source material
+2. Extrinsic hallucination: The generated output cannot be verified from the source
+3. Factual hallucination: Incorrect facts (wrong dates, names, figures)
+4. Faithfulness hallucination: Summary or answer contradicts the input document
+
+Root causes:
+- Training data noise and biases
+- Model overfitting to superficially plausible completions
+- Insufficient grounding in retrieved/provided context
+- Overconfident decoding (high temperature, nucleus sampling issues)
+
+Mitigation strategies:
+- RAG and CAG: Ground answers in an external knowledge base
+- Chain-of-thought prompting: Force step-by-step reasoning
+- Self-consistency: Sample multiple outputs and take majority vote
+- Factuality classifiers: Post-generation verification
+- RLHF with factuality rewards: Train models to prefer factual outputs
+- Citation/attribution: Force models to cite sources
+
+Detection methods:
+- NLI (Natural Language Inference) models to check entailment
+- LLM-as-judge: Use a second LLM to evaluate factual accuracy
+- SelfCheckGPT: Samples multiple generations and checks consistency
+
+================================================================================
+TOPIC: Prompt Engineering
+================================================================================
+Prompt engineering is the practice of designing and optimizing input prompts to
+elicit desired behaviors from language models without changing model weights.
+
+Core techniques:
+1. Zero-shot prompting: Ask the model directly without examples
+   Example: "Translate the following English text to French: ..."
+
+2. Few-shot prompting: Provide example input-output pairs in the prompt
+   Improves performance on tasks by demonstrating the desired format
+
+3. Chain-of-Thought (CoT): Instruct the model to reason step by step
+   "Let's think step by step..." significantly improves math/logic tasks
+
+4. Self-consistency: Generate multiple CoT paths, take majority answer
+
+5. Tree-of-Thought (ToT): Explore multiple reasoning branches like a search tree
+
+6. ReAct: Interleave reasoning (Thought) with action (Act) and observation steps
+   Used in agentic workflows to call tools and APIs
+
+7. Role prompting: Assign the model a persona ("You are an expert cardiologist...")
+
+8. System prompts: Instructions placed in the system turn to set behavior
+
+9. Constitutional AI: Provide principles the model must adhere to
+
+Prompt injection: A security vulnerability where malicious instructions in user
+input override system instructions. Critical to defend against in production.
+
+================================================================================
+TOPIC: Fine-Tuning vs. In-Context Learning
+================================================================================
+Two primary ways to adapt a pretrained LLM to a specific task:
+
+Fine-Tuning:
+- Updates model weights on task-specific data
+- Requires labeled training data and compute
+- Methods: Full fine-tuning, LoRA, QLoRA, Prefix Tuning, Adapter layers
+- LoRA (Low-Rank Adaptation): Injects trainable low-rank matrices into attention
+  layers, reducing trainable parameters by ~10,000x vs full fine-tuning
+- Best for: Tasks requiring specialized knowledge, style, or behavior not in pretraining
+
+In-Context Learning (ICL):
+- No weight updates — task demonstrated through prompt examples
+- Zero/few-shot: 0-32 examples in the context window
+- Advantages: No training cost, instant deployment, easy to update
+- Limitations: Limited by context window size, inconsistent on complex tasks
+
+RAG vs Fine-Tuning vs CAG:
+- Fine-tuning: Best for style/behavior adaptation; bad for injecting new facts
+- RAG: Best for dynamic, large knowledge bases; adds retrieval complexity
+- CAG: Best for small-to-medium static knowledge bases; simplest architecture
+
+================================================================================
+TOPIC: Evaluation Metrics for LLMs
+================================================================================
+Evaluating LLM outputs is challenging due to the open-ended nature of text generation.
+
+Automated metrics:
+- BLEU (Bilingual Evaluation Understudy): n-gram overlap with reference, used in MT
+- ROUGE (Recall-Oriented Understudy for Gisting Evaluation): Recall-focused, used in summarization
+- BERTScore: Semantic similarity using contextual embeddings
+- METEOR: Considers synonyms and stemming, more robust than BLEU
+- Perplexity: Measures how well the model predicts a test corpus
+
+Task-specific metrics:
+- Exact Match (EM): For QA tasks — does the predicted answer exactly match?
+- F1 Score: Token-level overlap between prediction and gold answer
+- MRR (Mean Reciprocal Rank): For retrieval evaluation
+- NDCG: Normalized Discounted Cumulative Gain, for ranking tasks
+
+LLM-as-judge evaluation:
+- Use a strong LLM (e.g., GPT-4) to score outputs on dimensions like:
+  correctness, helpfulness, harmlessness, coherence, groundedness
+- G-Eval framework: Structured scoring with chain-of-thought
+
+Benchmarks:
+- MMLU: Massive Multitask Language Understanding (57 subjects)
+- HellaSwag: Commonsense reasoning
+- HumanEval: Code generation
+- TruthfulQA: Measures tendency to hallucinate
+- RAGAS: Specific benchmark for RAG system evaluation (faithfulness, relevancy, recall)
+
+RAGAS metrics (relevant for this project):
+- Faithfulness: Is the answer supported by the retrieved/provided context?
+- Answer Relevancy: Is the answer relevant to the question?
+- Context Recall: Does the context contain the information needed to answer?
+- Context Precision: Is the retrieved context free of irrelevant information?
+
+================================================================================
+TOPIC: Agentic AI and Tool Use
+================================================================================
+Agentic AI systems extend LLMs with the ability to take multi-step actions,
+use tools, and interact with external systems to complete complex tasks.
+
+Key components:
+1. Planning: The LLM decomposes a task into sub-tasks (ReAct, Plan-and-Execute)
+2. Memory: Short-term (context window), long-term (vector DB), episodic
+3. Tool Use: APIs, code execution, web search, file I/O, databases
+4. Reflection: The agent evaluates its own outputs and corrects errors
+
+Popular frameworks:
+- LangChain: Most widely used, modular, supports RAG + agents
+- LlamaIndex: Focused on data indexing and retrieval for LLMs
+- AutoGen (Microsoft): Multi-agent conversations
+- CrewAI: Role-based multi-agent teams
+- Semantic Kernel (Microsoft): Enterprise-grade, C#/Python
+
+Function calling / Tool use:
+Modern LLMs (GPT-4, Claude, Gemini) support structured tool calling where the
+model can invoke predefined functions with typed arguments. The model outputs a
+JSON-formatted tool call, the application executes it, and the result is fed back.
+
+Multi-agent systems:
+- Orchestrator agent: Breaks down tasks, assigns to sub-agents
+- Sub-agents: Specialized in specific tools or domains
+- Critic/judge agent: Evaluates outputs of other agents
+
+================================================================================
+TOPIC: Attention Mechanisms and KV Cache
+================================================================================
+The attention mechanism is the core of the Transformer. It computes a weighted
+sum of value vectors, where weights are determined by the similarity of query
+and key vectors.
+
+Scaled Dot-Product Attention:
+  Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V
+
+Where:
+- Q (Query): What the current position is looking for
+- K (Key): What each position offers
+- V (Value): The actual content of each position
+- d_k: Dimension of keys (scaling factor for numerical stability)
+
+Multi-Head Attention:
+  MultiHead(Q,K,V) = Concat(head_1, ..., head_h) * W_O
+  head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
+
+KV Cache:
+The KV cache stores precomputed key and value matrices for previously processed
+tokens. During autoregressive generation, only new tokens need to be processed
+since cached KV pairs can be reused.
+
+KV Cache in CAG:
+This is CAG's most powerful optimization. If the knowledge base is static:
+1. Run the knowledge base through the model once to compute KV matrices
+2. Store (cache) the KV pairs for knowledge base tokens
+3. For each query, only compute KV pairs for the question tokens
+4. Append question KV pairs to cached knowledge base KV pairs
+
+Result: Subsequent queries to the same knowledge base are as fast as queries
+with no context at all — the knowledge base processing cost is amortized.
+
+Attention variants:
+- Multi-Head Attention (MHA): Standard Transformer attention
+- Multi-Query Attention (MQA): Single K,V head shared across all Q heads (faster)
+- Grouped Query Attention (GQA): Compromise between MHA and MQA (used in Llama)
+- Flash Attention: Memory-efficient exact attention using IO-aware tiling
+
+================================================================================
+TOPIC: Neural Network Fundamentals
+================================================================================
+Neural networks are computational graphs of interconnected nodes (neurons) that
+learn to map inputs to outputs through gradient-based optimization.
+
+Core components:
+- Neurons: Apply a weighted sum + bias, followed by an activation function
+- Layers: Input, hidden, output layers
+- Activation functions: ReLU, GELU, SiLU, Sigmoid, Tanh, Softmax
+- Loss functions: Cross-entropy (classification), MSE (regression), NLL
+
+Training:
+1. Forward pass: Compute predictions from input to output
+2. Loss computation: Measure error between predictions and ground truth
+3. Backward pass (backpropagation): Compute gradients using chain rule
+4. Parameter update: Gradient descent or adaptive optimizers
+
+Optimizers:
+- SGD: Stochastic Gradient Descent, simple but slow convergence
+- Adam: Adaptive moment estimation, widely used default
+- AdamW: Adam with weight decay, standard for LLM training
+- Lion: More memory-efficient, competitive with Adam
+
+Regularization:
+- Dropout: Randomly zero out neurons during training
+- Weight decay (L2): Penalize large weights
+- Batch normalization / Layer normalization: Normalize activations
+- Early stopping: Stop when validation loss stops improving
+
+================================================================================
+TOPIC: Tokenization
+================================================================================
+Tokenization is the process of converting raw text into discrete tokens that
+a language model can process. The vocabulary of tokens is fixed at training time.
+
+Methods:
+1. Word-level tokenization: Simple but large vocabulary, OOV problems
+2. Character-level: Small vocabulary, long sequences, loses word structure
+3. Subword tokenization: Best of both worlds, handles OOV naturally
+
+Subword algorithms:
+- BPE (Byte-Pair Encoding): Iteratively merge most frequent character pairs
+  Used by: GPT-2, GPT-3, GPT-4, LLaMA
+- WordPiece: Maximizes language model likelihood of training data
+  Used by: BERT, DistilBERT
+- Unigram: Starts with large vocabulary, prunes by likelihood
+  Used by: T5, Albert, mBART
+
+Tokenization impacts:
+- Code, math, and non-English text are tokenized less efficiently
+- 1 token ≈ 4 characters in English
+- Context window limits are in tokens, not words
+- Tokenization affects model behavior: "9.11" vs "9.9" comparison errors
+  are partly a tokenization artifact
+
+Special tokens:
+- [BOS] / <s>: Beginning of sequence
+- [EOS] / </s>: End of sequence
+- [PAD]: Padding token
+- [SEP]: Separator (BERT-style)
+- [MASK]: Masked token (BERT MLM)
+
+================================================================================
+TOPIC: Reinforcement Learning from Human Feedback (RLHF)
+================================================================================
+RLHF is a training paradigm that aligns LLMs to human preferences using
+reinforcement learning. It was key to making ChatGPT and Claude helpful and safe.
+
+RLHF Pipeline:
+1. Supervised Fine-Tuning (SFT): Fine-tune base LLM on high-quality
+   instruction-response demonstrations from human annotators.
+
+2. Reward Model Training: Collect human preference data — for each prompt,
+   present multiple responses and have annotators rank them. Train a reward model
+   (RM) to predict human preference scores.
+
+3. RL Optimization (PPO): Use Proximal Policy Optimization to fine-tune the
+   SFT model to maximize the reward model's score, with a KL-divergence penalty
+   to prevent the model from drifting too far from the SFT model.
+
+   Objective: max E[r(x,y)] - β * KL(π_θ || π_SFT)
+
+Alternatives to RLHF:
+- DPO (Direct Preference Optimization): Reparameterizes the RLHF objective
+  to directly optimize on preference data without a separate RM. More stable.
+- RLAIF: Use an AI model instead of humans for preference labeling
+- Constitutional AI (Anthropic): Provide a set of principles; use AI feedback
+  to train the model to follow them
+
+================================================================================
+TOPIC: Model Architectures: Encoder, Decoder, Encoder-Decoder
+================================================================================
+Three main Transformer-based architectures for NLP:
+
+1. Encoder-only (e.g., BERT, RoBERTa, DeBERTa):
+   - Bidirectional attention: Each token attends to all other tokens
+   - Pretraining: Masked Language Modeling (MLM) — predict masked tokens
+   - Best for: Classification, NER, embeddings, semantic similarity
+   - NOT suitable for text generation
+
+2. Decoder-only (e.g., GPT series, LLaMA, Claude, Gemini):
+   - Causal (autoregressive) attention: Each token only attends to previous tokens
+   - Pretraining: Next-token prediction (Causal Language Modeling)
+   - Best for: Text generation, instruction following, reasoning, chat
+   - Current dominant architecture for LLMs
+
+3. Encoder-Decoder (e.g., T5, BART, mT5):
+   - Encoder processes input bidirectionally
+   - Decoder generates output autoregressively, attending to encoder
+   - Pretraining: Various (T5: span corruption, BART: denoising)
+   - Best for: Summarization, translation, question answering
+   - RAG models (Lewis et al. 2020) originally used BART as the generator
+
+================================================================================
+TOPIC: Chunking Strategies for RAG
+================================================================================
+Chunking is the process of splitting documents into smaller pieces for indexing
+in a RAG system. It is one of the most impactful design decisions in RAG.
+
+Fixed-size chunking:
+- Split text into chunks of N tokens/characters with overlap
+- Simple, predictable, widely used
+- Risk: Splits mid-sentence or mid-concept
+- Typical: 256-512 tokens, 10-20% overlap
+
+Sentence-level chunking:
+- Use NLP sentence splitters (spaCy, NLTK)
+- Preserves semantic units
+- Variable chunk sizes
+
+Recursive character text splitting:
+- Try to split on paragraph -> sentence -> word boundaries in order
+- Used as default in LangChain
+
+Semantic chunking:
+- Compute embeddings for each sentence
+- Split when cosine similarity drops below threshold
+- Most expensive but highest quality
+
+Document-level chunking:
+- Each document is one chunk
+- Only feasible for short documents
+
+Hierarchical chunking:
+- Parent-child chunks: Small chunks for retrieval, large for context
+- Small-to-Big retrieval: Retrieve small chunk, return its parent paragraph
+
+Chunking impact on RAG vs CAG:
+- RAG quality is highly sensitive to chunking strategy
+- CAG eliminates this dependency entirely — no chunking required
+
+================================================================================
+TOPIC: Mixture of Experts (MoE)
+================================================================================
+Mixture of Experts is an architecture that replaces dense feed-forward layers
+with a collection of "expert" networks, routing each token to only a subset
+of experts. This allows scaling model capacity without proportionally scaling
+compute.
+
+Key components:
+- Expert networks: N feed-forward networks (e.g., N=8, N=64, N=2048)
+- Router/Gating network: A learned linear layer that selects which experts
+  handle each token. Typically top-k experts are selected (usually k=1 or k=2)
+- Load balancing loss: Auxiliary loss to prevent all tokens routing to same experts
+
+Notable MoE models:
+- Mixtral 8x7B (Mistral AI): 8 experts, 2 active per token, ~46.7B total params
+  but only ~12.9B active params — performance of 70B at cost of 13B
+- GPT-4 (rumored): Mixture of experts
+- Gemini 1.5 (Google): MoE architecture, 1M context window
+- Switch Transformer (Google, 2021): First large-scale MoE Transformer
+
+Sparse vs Dense:
+- Dense: All parameters active for every token (GPT-3, LLaMA)
+- Sparse (MoE): Only a fraction of parameters active per token
+- Result: Can train much larger models at same compute budget
+
+================================================================================
+TOPIC: Constitutional AI and AI Safety
+================================================================================
+Constitutional AI (CAI) is Anthropic's approach to training AI systems that are
+helpful, harmless, and honest. It uses a set of principles (a "constitution") to
+guide model behavior through AI-generated feedback rather than relying entirely
+on human labeling.
+
+CAI Pipeline:
+1. SL-CAI (Supervised Learning from AI Feedback):
+   - Generate responses to harmful prompts
+   - Ask the model to critique responses using constitutional principles
+   - Revise responses based on critiques
+   - Fine-tune on revised responses
+
+2. RL-CAI (Reinforcement Learning from AI Feedback - RLAIF):
+   - Generate pairs of responses
+   - Use the model to choose preferred response based on principles
+   - Train a preference model on AI judgments
+   - Fine-tune using RL against preference model
+
+Key principles in Anthropic's constitution:
+- Avoid assisting with harmful, unethical, or dangerous activities
+- Be honest and don't deceive
+- Respect privacy and individual rights
+- Support democratic institutions
+
+Alignment concepts:
+- Alignment: Ensuring AI systems pursue intended goals
+- Robustness: Maintaining safe behavior under distribution shift
+- Interpretability: Understanding what's happening inside the model
+- Scalable oversight: Using AI to help humans supervise more capable AI
+
+================================================================================

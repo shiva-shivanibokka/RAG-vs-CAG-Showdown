@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -81,3 +81,29 @@ def test_query_both(client):
 def test_query_empty_question_rejected(client):
     response = client.post("/query/cag", json={"question": ""})
     assert response.status_code == 422
+
+
+MOCK_BENCHMARK_RESULT = {
+    "timestamp": "20260625_000000",
+    "summary": {
+        "num_questions": 1,
+        "cag": {"avg_judge_score": 4.0, "avg_latency_seconds": 1.2, "wins": 1},
+        "rag": {"avg_judge_score": 3.5, "avg_latency_seconds": 0.4, "wins": 0},
+        "ties": 0,
+    },
+    "results": [],
+}
+
+
+def test_benchmark_endpoint(client):
+    mock_bench = MagicMock()
+    mock_bench.run_async = AsyncMock(return_value=MOCK_BENCHMARK_RESULT)
+
+    with patch("api.app.Benchmarker", return_value=mock_bench):
+        response = client.post("/benchmark", json={"use_judge": False, "top_k": 3})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert "timestamp" in data
+    assert "summary" in data
+    mock_bench.run_async.assert_called_once_with(verbose=False)

@@ -5,12 +5,13 @@ Run: streamlit run dashboard/app.py
 """
 
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
-RESULTS_DIR = Path(__file__).parent.parent / "results"
+RESULTS_DIR = Path(os.getenv("RESULTS_DIR", str(Path(__file__).parent.parent / "results")))
 
 st.set_page_config(
     page_title="CAG vs RAG Showdown",

@@ -84,6 +84,29 @@ class BenchmarkRequest(BaseModel):
     top_k: int = RAG_TOP_K
 
 
+class RetrievedChunk(BaseModel):
+    title: str
+    similarity_score: float
+
+
+class QueryResponse(BaseModel):
+    answer: str
+    latency_seconds: float
+    input_tokens: int
+    output_tokens: int
+    model: str
+    method: str
+    context_used: str
+    retrieved_chunks: list[RetrievedChunk] | None = None
+    retrieval_latency_seconds: float | None = None
+    generation_latency_seconds: float | None = None
+
+
+class BothQueryResponse(BaseModel):
+    cag: QueryResponse
+    rag: QueryResponse
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -94,7 +117,7 @@ def health():
     return {"status": "ok", "model": OLLAMA_MODEL, "ollama_host": OLLAMA_HOST}
 
 
-@app.post("/query/cag")
+@app.post("/query/cag", response_model=QueryResponse)
 def query_cag(req: QueryRequest, cag: Annotated[CAGEngine, Depends(get_cag)]):
     try:
         return cag.query(req.question)
@@ -103,7 +126,7 @@ def query_cag(req: QueryRequest, cag: Annotated[CAGEngine, Depends(get_cag)]):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.post("/query/rag")
+@app.post("/query/rag", response_model=QueryResponse)
 def query_rag(req: QueryRequest, rag: Annotated[RAGEngine, Depends(get_rag)]):
     try:
         return rag.query(req.question)
@@ -112,7 +135,7 @@ def query_rag(req: QueryRequest, rag: Annotated[RAGEngine, Depends(get_rag)]):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@app.post("/query/both")
+@app.post("/query/both", response_model=BothQueryResponse)
 def query_both(
     req: QueryRequest,
     cag: Annotated[CAGEngine, Depends(get_cag)],
@@ -126,7 +149,7 @@ def query_both(
 
 
 @app.post("/benchmark")
-def run_benchmark(
+async def run_benchmark(
     req: BenchmarkRequest,
     cag: Annotated[CAGEngine, Depends(get_cag)],
     rag: Annotated[RAGEngine, Depends(get_rag)],
@@ -138,7 +161,7 @@ def run_benchmark(
             use_judge=req.use_judge,
             results_dir=Path(__file__).parent.parent / "results",
         )
-        return bench.run(verbose=False)
+        return await bench.run_async(verbose=False)
     except Exception as exc:
         logger.error("Benchmark failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

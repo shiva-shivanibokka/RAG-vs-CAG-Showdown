@@ -8,30 +8,33 @@ Usage:
     python main.py ask cag "..."      Single question via CAG
     python main.py ask rag "..."      Single question via RAG
     python main.py ask both "..."     Ask both and compare side by side
-    python main.py benchmark --no-judge   Skip LLM judge scoring (faster/cheaper)
+    python main.py benchmark --no-judge   Skip LLM judge scoring (faster)
     python main.py benchmark --top-k 5    Set RAG top-k chunks (default: 3)
 
-Environment variables:
-    ANTHROPIC_API_KEY   Required — your Anthropic API key
+Environment variables (see .env.example):
+    OLLAMA_HOST     Ollama server URL (default: http://localhost:11434)
+    OLLAMA_MODEL    Model tag (default: llama3.1:8b)
+    RAG_TOP_K       Top-k chunks for RAG (default: 3)
+    LOG_LEVEL       Logging verbosity (default: INFO)
 """
 
-import sys
-import os
-import json
 import argparse
+import asyncio
+import sys
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-# Add project root to Python path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.cag.engine import CAGEngine
-from src.rag.engine import RAGEngine
-from src.benchmark.evaluator import Benchmarker
+from src.benchmark.evaluator import Benchmarker  # noqa: E402
+from src.cag.engine import CAGEngine  # noqa: E402
+from src.config import OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K, setup_logging  # noqa: E402
+from src.rag.engine import RAGEngine  # noqa: E402
 
 KNOWLEDGE_BASE = PROJECT_ROOT / "knowledge_base" / "aiml_corpus.txt"
 RESULTS_DIR = PROJECT_ROOT / "results"
-DEFAULT_MODEL = "claude-3-5-haiku-20241022"
 
 
 # ---------------------------------------------------------------------------
@@ -39,32 +42,33 @@ DEFAULT_MODEL = "claude-3-5-haiku-20241022"
 # ---------------------------------------------------------------------------
 
 
-def check_api_key():
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("[ERROR] ANTHROPIC_API_KEY environment variable is not set.")
-        print("  Set it with: set ANTHROPIC_API_KEY=your_key_here  (Windows)")
-        print("           or: export ANTHROPIC_API_KEY=your_key_here  (Unix)")
+def check_ollama() -> None:
+    try:
+        urllib.request.urlopen(f"{OLLAMA_HOST}/api/tags", timeout=3)
+    except urllib.error.URLError:
+        print(f"[ERROR] Cannot reach Ollama at {OLLAMA_HOST}")
+        print("  1. Start Ollama:  ollama serve")
+        print(f"  2. Pull a model:  ollama pull {OLLAMA_MODEL}")
         sys.exit(1)
 
 
-def print_banner():
+def print_banner() -> None:
     print("""
-╔══════════════════════════════════════════════════════════════╗
+╔═══════════════════════════════════════════════════════════════╗
 ║           CAG vs RAG Showdown Framework                      ║
 ║           Context Augmented Generation vs                    ║
 ║           Retrieval Augmented Generation                     ║
-╚══════════════════════════════════════════════════════════════╝
+╚═══════════════════════════════════════════════════════════════╝
 """)
 
 
 def format_answer_block(method: str, result: dict) -> str:
-    """Pretty-print a single engine result."""
     lines = [
         f"\n{'─' * 60}",
         f"  {method} ANSWER",
         f"{'─' * 60}",
         result["answer"],
-        f"\n  Stats:",
+        "\n  Stats:",
         f"  • Latency       : {result['latency_seconds']}s",
         f"  • Input tokens  : {result['input_tokens']:,}",
         f"  • Output tokens : {result['output_tokens']:,}",
@@ -81,68 +85,53 @@ def format_answer_block(method: str, result: dict) -> str:
 # ---------------------------------------------------------------------------
 
 
-def cmd_benchmark(args):
+def cmd_benchmark(args) -> None:
     print_banner()
-    check_api_key()
+    check_ollama()
 
-    model = args.model or DEFAULT_MODEL
-    top_k = args.top_k or 3
+    model = args.model or OLLAMA_MODEL
+    top_k = args.top_k or RAG_TOP_K
     use_judge = not args.no_judge
 
     print(f"  Model       : {model}")
     print(f"  RAG top-k   : {top_k}")
     print(f"  LLM Judge   : {'enabled' if use_judge else 'disabled'}")
-    print()
+    print("  Mode        : async parallel\n")
 
     cag = CAGEngine(KNOWLEDGE_BASE, model=model)
     rag = RAGEngine(KNOWLEDGE_BASE, model=model, top_k=top_k)
-
     bench = Benchmarker(
-        cag_engine=cag,
-        rag_engine=rag,
-        use_judge=use_judge,
-        results_dir=RESULTS_DIR,
+        cag_engine=cag, rag_engine=rag, use_judge=use_judge, results_dir=RESULTS_DIR
     )
-    bench.run(verbose=True)
+    asyncio.run(bench.run_async(verbose=True))
 
 
-def cmd_chat(args):
+def cmd_chat(args) -> None:
     print_banner()
-    check_api_key()
+    check_ollama()
 
-    method = args.method.lower()
-    model = args.model or DEFAULT_MODEL
-
-    if method == "cag":
-        engine = CAGEngine(KNOWLEDGE_BASE, model=model)
-        engine.interactive()
-    elif method == "rag":
-        engine = RAGEngine(KNOWLEDGE_BASE, model=model, top_k=args.top_k or 3)
-        engine.interactive()
+    model = args.model or OLLAMA_MODEL
+    if args.method == "cag":
+        CAGEngine(KNOWLEDGE_BASE, model=model).interactive()
     else:
-        print(f"Unknown method '{method}'. Use 'cag' or 'rag'.")
-        sys.exit(1)
+        RAGEngine(KNOWLEDGE_BASE, model=model, top_k=args.top_k or RAG_TOP_K).interactive()
 
 
-def cmd_ask(args):
+def cmd_ask(args) -> None:
     print_banner()
-    check_api_key()
+    check_ollama()
 
     question = args.question
-    method = args.method.lower()
-    model = args.model or DEFAULT_MODEL
-    top_k = args.top_k or 3
-
+    model = args.model or OLLAMA_MODEL
+    top_k = args.top_k or RAG_TOP_K
     print(f"  Question: {question}\n")
 
-    if method in ("cag", "both"):
-        engine = CAGEngine(KNOWLEDGE_BASE, model=model)
-        result = engine.query(question)
+    if args.method in ("cag", "both"):
+        result = CAGEngine(KNOWLEDGE_BASE, model=model).query(question)
         print(format_answer_block("CAG", result))
 
-    if method in ("rag", "both"):
-        engine = RAGEngine(KNOWLEDGE_BASE, model=model, top_k=top_k)
-        result = engine.query(question)
+    if args.method in ("rag", "both"):
+        result = RAGEngine(KNOWLEDGE_BASE, model=model, top_k=top_k).query(question)
         print(format_answer_block("RAG", result))
 
     print()
@@ -162,50 +151,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    # --- benchmark ---
     bench_parser = subparsers.add_parser("benchmark", help="Run full benchmark suite")
-    bench_parser.add_argument(
-        "--model", type=str, default=None, help="Anthropic model ID"
-    )
-    bench_parser.add_argument(
-        "--top-k", type=int, default=3, help="RAG top-k chunks (default: 3)"
-    )
-    bench_parser.add_argument(
-        "--no-judge", action="store_true", help="Skip LLM judge scoring"
-    )
+    bench_parser.add_argument("--model", type=str, default=None)
+    bench_parser.add_argument("--top-k", type=int, default=None)
+    bench_parser.add_argument("--no-judge", action="store_true")
     bench_parser.set_defaults(func=cmd_benchmark)
 
-    # --- chat ---
     chat_parser = subparsers.add_parser("chat", help="Interactive chat session")
-    chat_parser.add_argument("method", choices=["cag", "rag"], help="Engine to use")
-    chat_parser.add_argument(
-        "--model", type=str, default=None, help="Anthropic model ID"
-    )
-    chat_parser.add_argument(
-        "--top-k", type=int, default=3, help="RAG top-k (default: 3)"
-    )
+    chat_parser.add_argument("method", choices=["cag", "rag"])
+    chat_parser.add_argument("--model", type=str, default=None)
+    chat_parser.add_argument("--top-k", type=int, default=None)
     chat_parser.set_defaults(func=cmd_chat)
 
-    # --- ask ---
-    ask_parser = subparsers.add_parser(
-        "ask", help="Single question, one or both engines"
-    )
-    ask_parser.add_argument(
-        "method", choices=["cag", "rag", "both"], help="Engine to use"
-    )
-    ask_parser.add_argument("question", type=str, help="The question to ask")
-    ask_parser.add_argument(
-        "--model", type=str, default=None, help="Anthropic model ID"
-    )
-    ask_parser.add_argument(
-        "--top-k", type=int, default=3, help="RAG top-k (default: 3)"
-    )
+    ask_parser = subparsers.add_parser("ask", help="Single question")
+    ask_parser.add_argument("method", choices=["cag", "rag", "both"])
+    ask_parser.add_argument("question", type=str)
+    ask_parser.add_argument("--model", type=str, default=None)
+    ask_parser.add_argument("--top-k", type=int, default=None)
     ask_parser.set_defaults(func=cmd_ask)
 
     return parser
 
 
-def main():
+def main() -> None:
+    setup_logging()
     parser = build_parser()
     args = parser.parse_args()
     args.func(args)

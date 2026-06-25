@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OLLAMA_HOST: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")
+CF_API_TOKEN: str = os.getenv("CF_API_TOKEN", "")
+CF_MODEL: str = os.getenv("CF_MODEL", "@cf/meta/llama-3.1-8b-instruct")
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "3"))
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))

@@ -6,13 +6,10 @@ import pytest
 from src.rag.engine import RAGEngine
 
 
-def test_query_returns_correct_keys(tmp_knowledge_base, mock_ollama_client):
+def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
     with patch("src.rag.engine.SentenceTransformer") as mock_st:
         mock_st.return_value.encode.return_value = np.random.rand(3, 384).astype("float32")
-        engine = RAGEngine(tmp_knowledge_base, _client=mock_ollama_client)
-        mock_ollama_client.chat.return_value.message.content = "RAG answer"
-        mock_ollama_client.chat.return_value.prompt_eval_count = 80
-        mock_ollama_client.chat.return_value.eval_count = 30
+        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
         result = engine.query("What is KV cache?")
 
     assert set(result.keys()) == {
@@ -29,10 +26,10 @@ def test_query_returns_correct_keys(tmp_knowledge_base, mock_ollama_client):
     }
 
 
-def test_query_method_is_rag(tmp_knowledge_base, mock_ollama_client):
+def test_query_method_is_rag(tmp_knowledge_base, mock_cf_client):
     with patch("src.rag.engine.SentenceTransformer") as mock_st:
         mock_st.return_value.encode.return_value = np.random.rand(3, 384).astype("float32")
-        engine = RAGEngine(tmp_knowledge_base, _client=mock_ollama_client)
+        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
         result = engine.query("test")
 
     assert result["method"] == "RAG"
@@ -44,28 +41,30 @@ def test_missing_knowledge_base_raises(tmp_path):
         RAGEngine(tmp_path / "nonexistent.txt")
 
 
-def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_ollama_client):
+def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_cf_client):
     kb = tmp_path / "plain.txt"
     kb.write_text("No topic markers here. Just plain text with many words. " * 50)
     with patch("src.rag.engine.SentenceTransformer") as mock_st:
         mock_st.return_value.encode.return_value = np.random.rand(1, 384).astype("float32")
-        engine = RAGEngine(kb, _client=mock_ollama_client)
+        engine = RAGEngine(kb, _client=mock_cf_client)
     assert len(engine.chunks) > 0
 
 
 @pytest.mark.asyncio
 async def test_query_async_returns_correct_keys(tmp_knowledge_base):
+    choice = MagicMock()
+    choice.message.content = "async RAG answer"
     async_response = MagicMock()
-    async_response.message.content = "async RAG answer"
-    async_response.prompt_eval_count = 120
-    async_response.eval_count = 45
+    async_response.choices = [choice]
+    async_response.usage.prompt_tokens = 120
+    async_response.usage.completion_tokens = 45
 
     async_client = MagicMock()
-    async_client.chat = AsyncMock(return_value=async_response)
+    async_client.chat.completions.create = AsyncMock(return_value=async_response)
 
     with (
         patch("src.rag.engine.SentenceTransformer") as mock_st,
-        patch("src.rag.engine.AsyncClient", return_value=async_client),
+        patch("src.rag.engine.AsyncOpenAI", return_value=async_client),
     ):
         mock_st.return_value.encode.return_value = np.random.rand(3, 384).astype("float32")
         engine = RAGEngine(tmp_knowledge_base)

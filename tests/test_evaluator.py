@@ -58,7 +58,7 @@ def test_score_returns_zeros_on_error():
     from unittest.mock import MagicMock
 
     mock_client = MagicMock()
-    mock_client.chat.side_effect = RuntimeError("connection refused")
+    mock_client.chat.completions.create.side_effect = RuntimeError("connection refused")
     judge = LLMJudge(_client=mock_client, max_retries=1)
     result = judge.score("q", "a", ["concept"])
     assert result["total"] == 0
@@ -69,10 +69,12 @@ def test_score_parses_valid_response():
     from unittest.mock import MagicMock
 
     raw = '{"correctness": 5, "completeness": 4, "coherence": 5, "groundedness": 4, "reasoning": "great"}'
+    mock_choice = MagicMock()
+    mock_choice.message.content = raw
     mock_resp = MagicMock()
-    mock_resp.message.content = raw
+    mock_resp.choices = [mock_choice]
     mock_client = MagicMock()
-    mock_client.chat.return_value = mock_resp
+    mock_client.chat.completions.create.return_value = mock_resp
     judge = LLMJudge(_client=mock_client)
     result = judge.score("q", "a", ["c"])
     assert result["total"] == 4.5

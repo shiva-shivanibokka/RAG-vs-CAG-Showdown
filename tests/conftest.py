@@ -35,11 +35,16 @@ def tmp_knowledge_base(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def mock_ollama_client():
-    client = MagicMock()
+def mock_cf_client():
+    """Minimal OpenAI-compatible client mock for use in engine tests."""
+    choice = MagicMock()
+    choice.message.content = "This is a test answer."
+
     response = MagicMock()
-    response.message.content = "This is a test answer."
-    response.prompt_eval_count = 150
-    response.eval_count = 40
-    client.chat.return_value = response
+    response.choices = [choice]
+    response.usage.prompt_tokens = 150
+    response.usage.completion_tokens = 40
+
+    client = MagicMock()
+    client.chat.completions.create.return_value = response
     return client

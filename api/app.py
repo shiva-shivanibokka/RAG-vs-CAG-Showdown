@@ -16,7 +16,7 @@ from pydantic import BaseModel, field_validator
 
 from src.benchmark.evaluator import Benchmarker
 from src.cag.engine import CAGEngine
-from src.config import API_ROOT_PATH, CORS_ORIGINS, OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K
+from src.config import API_ROOT_PATH, CF_MODEL, CORS_ORIGINS, RAG_TOP_K
 from src.rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -30,9 +30,9 @@ _rag: RAGEngine | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _cag, _rag
-    logger.info("Loading engines on startup (model=%s)...", OLLAMA_MODEL)
-    _cag = CAGEngine(KNOWLEDGE_BASE, model=OLLAMA_MODEL)
-    _rag = RAGEngine(KNOWLEDGE_BASE, model=OLLAMA_MODEL, top_k=RAG_TOP_K)
+    logger.info("Loading engines on startup (model=%s)...", CF_MODEL)
+    _cag = CAGEngine(KNOWLEDGE_BASE, model=CF_MODEL)
+    _rag = RAGEngine(KNOWLEDGE_BASE, model=CF_MODEL, top_k=RAG_TOP_K)
     logger.info("Engines ready.")
     yield
     _cag = None
@@ -122,7 +122,7 @@ class BothQueryResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": OLLAMA_MODEL, "ollama_host": OLLAMA_HOST}
+    return {"status": "ok", "model": CF_MODEL, "provider": "Cloudflare Workers AI"}
 
 
 @app.post("/query/cag", response_model=QueryResponse)

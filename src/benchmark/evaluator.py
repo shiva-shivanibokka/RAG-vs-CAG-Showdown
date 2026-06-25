@@ -2,7 +2,7 @@
 Benchmark Evaluator
 ===================
 Runs questions through CAG and RAG, measures latency and token counts,
-scores answers with an LLM-as-judge (local Ollama), saves JSON + CSV.
+scores answers with an LLM-as-judge (Cloudflare Workers AI), saves JSON + CSV.
 """
 
 import asyncio
@@ -14,11 +14,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from ollama import AsyncClient, Client
+from openai import AsyncOpenAI, OpenAI
 
-from src.config import MAX_RETRIES, OLLAMA_HOST, OLLAMA_MODEL
+from src.config import CF_ACCOUNT_ID, CF_API_TOKEN, CF_MODEL, MAX_RETRIES
 
 logger = logging.getLogger(__name__)
+
+_CF_BASE_URL = (
+    f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
+)
 
 # ---------------------------------------------------------------------------
 # Default benchmark questions
@@ -114,19 +118,20 @@ _REQUIRED_FIELDS = {"correctness", "completeness", "coherence", "groundedness"}
 
 
 class LLMJudge:
-    """Scores answers using a local Ollama model as judge."""
+    """Scores answers using Cloudflare Workers AI as an LLM judge."""
 
     def __init__(
         self,
-        judge_model: str = OLLAMA_MODEL,
-        ollama_host: str = OLLAMA_HOST,
+        judge_model: str = CF_MODEL,
         max_retries: int = MAX_RETRIES,
         _client=None,
     ):
         self.judge_model = judge_model
-        self._ollama_host = ollama_host
         self._max_retries = max_retries
-        self._client: Client = _client or Client(host=ollama_host)
+        self._client: OpenAI = _client or OpenAI(
+            api_key=CF_API_TOKEN,
+            base_url=_CF_BASE_URL,
+        )
 
     def _parse_judge_response(self, raw: str) -> dict:
         """Strip markdown fences, parse JSON, validate required fields, add total."""
@@ -151,12 +156,12 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                response = self._client.chat(
+                response = self._client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,
-                    options={"num_predict": 256},
+                    max_tokens=256,
                 )
-                return self._parse_judge_response(response.message.content)
+                return self._parse_judge_response(response.choices[0].message.content)
             except Exception as exc:
                 last_exc = exc
                 logger.warning(
@@ -185,13 +190,13 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                client = AsyncClient(host=self._ollama_host)
-                response = await client.chat(
+                async_client = AsyncOpenAI(api_key=CF_API_TOKEN, base_url=_CF_BASE_URL)
+                response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,
-                    options={"num_predict": 256},
+                    max_tokens=256,
                 )
-                return self._parse_judge_response(response.message.content)
+                return self._parse_judge_response(response.choices[0].message.content)
             except Exception as exc:
                 last_exc = exc
                 wait = 2**attempt

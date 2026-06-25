@@ -1,8 +1,8 @@
 """
-RAG Engine — Retrieval Augmented Generation (Ollama backend)
-============================================================
+RAG Engine — Retrieval Augmented Generation (Cloudflare Workers AI backend)
+===========================================================================
 1. Index: chunk -> embed (sentence-transformers) -> FAISS
-2. Query: embed question -> top-k retrieval -> Ollama generation
+2. Query: embed question -> top-k retrieval -> Cloudflare AI generation
 """
 
 import logging
@@ -12,19 +12,24 @@ from pathlib import Path
 
 import faiss
 import numpy as np
-from ollama import AsyncClient, Client
+from openai import AsyncOpenAI, OpenAI
 from sentence_transformers import SentenceTransformer
 
 from src.config import (
+    CF_ACCOUNT_ID,
+    CF_API_TOKEN,
+    CF_MODEL,
     EMBEDDING_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
-    OLLAMA_HOST,
-    OLLAMA_MODEL,
     RAG_TOP_K,
 )
 
 logger = logging.getLogger(__name__)
+
+_CF_BASE_URL = (
+    f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -61,35 +66,33 @@ def chunk_fixed_size(text: str, chunk_size: int = 400, overlap: int = 50) -> lis
 
 class RAGEngine:
     """
-    Retrieval Augmented Generation backed by FAISS + local Ollama model.
+    Retrieval Augmented Generation backed by FAISS + Cloudflare Workers AI.
 
     Parameters
     ----------
     knowledge_base_path : str | Path
     model : str
-        Ollama model tag.
+        Cloudflare Workers AI model tag.
     embedding_model_name : str
-        sentence-transformers model for embedding.
+        sentence-transformers model for embedding (runs locally).
     top_k : int
         Number of chunks to retrieve per query.
     max_tokens : int
         Maximum tokens to generate.
-    ollama_host : str
     max_retries : int
     chunking_strategy : str
         "topic" (semantic, preferred) or "fixed" (fallback).
     _client : optional
-        Injected Ollama Client for tests.
+        Injected OpenAI-compatible client for tests.
     """
 
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = OLLAMA_MODEL,
+        model: str = CF_MODEL,
         embedding_model_name: str = EMBEDDING_MODEL,
         top_k: int = RAG_TOP_K,
         max_tokens: int = MAX_TOKENS,
-        ollama_host: str = OLLAMA_HOST,
         max_retries: int = MAX_RETRIES,
         chunking_strategy: str = "topic",
         _client=None,
@@ -97,9 +100,11 @@ class RAGEngine:
         self.model = model
         self.top_k = top_k
         self.max_tokens = max_tokens
-        self._ollama_host = ollama_host
         self._max_retries = max_retries
-        self._client: Client = _client or Client(host=ollama_host)
+        self._client: OpenAI = _client or OpenAI(
+            api_key=CF_API_TOKEN,
+            base_url=_CF_BASE_URL,
+        )
 
         kb_path = Path(knowledge_base_path)
         if not kb_path.exists():
@@ -196,16 +201,16 @@ class RAGEngine:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                return self._client.chat(
+                return self._client.chat.completions.create(
                     model=self.model,
                     messages=messages,
-                    options={"num_predict": self.max_tokens},
+                    max_tokens=self.max_tokens,
                 )
             except Exception as exc:
                 last_exc = exc
                 wait = 2**attempt
                 logger.warning(
-                    "Ollama call failed (attempt %d/%d): %s. Retrying in %ds.",
+                    "CF AI call failed (attempt %d/%d): %s. Retrying in %ds.",
                     attempt + 1,
                     self._max_retries,
                     exc,
@@ -213,7 +218,7 @@ class RAGEngine:
                 )
                 time.sleep(wait)
         raise RuntimeError(
-            f"Ollama call failed after {self._max_retries} attempts"
+            f"CF AI call failed after {self._max_retries} attempts"
         ) from last_exc
 
     # ------------------------------------------------------------------
@@ -232,12 +237,12 @@ class RAGEngine:
         total_latency = time.perf_counter() - total_start
 
         return {
-            "answer": response.message.content,
+            "answer": response.choices[0].message.content,
             "latency_seconds": round(total_latency, 3),
             "retrieval_latency_seconds": round(retrieval_latency, 3),
             "generation_latency_seconds": round(generation_latency, 3),
-            "input_tokens": response.prompt_eval_count or 0,
-            "output_tokens": response.eval_count or 0,
+            "input_tokens": response.usage.prompt_tokens if response.usage else 0,
+            "output_tokens": response.usage.completion_tokens if response.usage else 0,
             "model": self.model,
             "method": "RAG",
             "context_used": f"Top-{self.top_k} retrieved chunks",
@@ -254,22 +259,22 @@ class RAGEngine:
 
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        client = AsyncClient(host=self._ollama_host)
-        response = await client.chat(
+        async_client = AsyncOpenAI(api_key=CF_API_TOKEN, base_url=_CF_BASE_URL)
+        response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,
-            options={"num_predict": self.max_tokens},
+            max_tokens=self.max_tokens,
         )
         generation_latency = time.perf_counter() - gen_start
         total_latency = time.perf_counter() - total_start
 
         return {
-            "answer": response.message.content,
+            "answer": response.choices[0].message.content,
             "latency_seconds": round(total_latency, 3),
             "retrieval_latency_seconds": round(retrieval_latency, 3),
             "generation_latency_seconds": round(generation_latency, 3),
-            "input_tokens": response.prompt_eval_count or 0,
-            "output_tokens": response.eval_count or 0,
+            "input_tokens": response.usage.prompt_tokens if response.usage else 0,
+            "output_tokens": response.usage.completion_tokens if response.usage else 0,
             "model": self.model,
             "method": "RAG",
             "context_used": f"Top-{self.top_k} retrieved chunks",

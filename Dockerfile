@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 
+# Pre-download the embedding model so cold starts don't re-download it
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
 # Copy source after deps so layer is cached
 COPY . .
 

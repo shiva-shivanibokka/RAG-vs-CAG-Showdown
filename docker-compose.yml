@@ -1,0 +1,42 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.1:8b}
+      - RAG_TOP_K=${RAG_TOP_K:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: on-failure
+
+  dashboard:
+    build: .
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - RESULTS_DIR=/app/results
+    volumes:
+      - ./results:/app/results
+    depends_on:
+      - api
+
+volumes:
+  ollama_data:

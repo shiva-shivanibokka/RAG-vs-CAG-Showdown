@@ -41,3 +41,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# React frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env

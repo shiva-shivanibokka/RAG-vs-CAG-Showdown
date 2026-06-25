@@ -1,0 +1,45 @@
+import { useState } from 'react'
+import Header from './components/Header'
+import QueryPanel from './components/QueryPanel'
+import BenchmarkPanel from './components/BenchmarkPanel'
+import HealthStatus from './components/HealthStatus'
+
+const TABS = [
+  { id: 'query', label: 'Query' },
+  { id: 'benchmark', label: 'Benchmark' },
+  { id: 'health', label: 'Health' },
+]
+
+export default function App() {
+  const [tab, setTab] = useState('query')
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <Header />
+
+      <nav className="border-b border-slate-800 bg-slate-900">
+        <div className="max-w-6xl mx-auto px-4 flex gap-1">
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-5 py-3 text-sm font-medium transition-colors ${
+                tab === t.id
+                  ? 'text-white border-b-2 border-blue-500'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        {tab === 'query' && <QueryPanel />}
+        {tab === 'benchmark' && <BenchmarkPanel />}
+        {tab === 'health' && <HealthStatus />}
+      </main>
+    </div>
+  )
+}

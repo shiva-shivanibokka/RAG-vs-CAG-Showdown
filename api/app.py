@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
 from src.benchmark.evaluator import Benchmarker
 from src.cag.engine import CAGEngine
-from src.config import API_ROOT_PATH, OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K
+from src.config import API_ROOT_PATH, CORS_ORIGINS, OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K
 from src.rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     root_path=API_ROOT_PATH,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in CORS_ORIGINS.split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 

@@ -1,9 +1,8 @@
 services:
   ollama:
     image: ollama/ollama:latest
-    # Port 11434 is NOT exposed publicly — the api service reaches Ollama
-    # over the internal Docker network. Never expose Ollama to the internet;
-    # it has no authentication.
+    # Port 11434 is NOT exposed — api reaches Ollama over the internal network.
+    # Never expose Ollama to the internet; it has no authentication.
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -14,7 +13,7 @@ services:
       start_period: 30s
 
   # Pulls the model into Ollama's volume before the api starts.
-  # Runs once and exits. Set OLLAMA_MODEL env var to use a different model.
+  # Runs once and exits. Set OLLAMA_MODEL env var to pull a different model.
   ollama-init:
     image: ollama/ollama:latest
     depends_on:
@@ -35,6 +34,7 @@ services:
       - RAG_TOP_K=${RAG_TOP_K:-3}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - API_ROOT_PATH=/api
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
     depends_on:
       ollama:
         condition: service_healthy
@@ -48,17 +48,6 @@ services:
       start_period: 60s
     restart: on-failure
 
-  dashboard:
-    build: .
-    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
-    environment:
-      - RESULTS_DIR=/app/results
-    volumes:
-      - ./results:/app/results
-    depends_on:
-      api:
-        condition: service_healthy
-
   nginx:
     image: nginx:alpine
     ports:
@@ -71,8 +60,6 @@ services:
     depends_on:
       api:
         condition: service_healthy
-      dashboard:
-        condition: service_started
     restart: unless-stopped
 
 volumes:

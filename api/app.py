@@ -15,7 +15,7 @@ from pydantic import BaseModel, field_validator
 
 from src.benchmark.evaluator import Benchmarker
 from src.cag.engine import CAGEngine
-from src.config import OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K
+from src.config import API_ROOT_PATH, OLLAMA_HOST, OLLAMA_MODEL, RAG_TOP_K
 from src.rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -43,6 +43,7 @@ app = FastAPI(
     description="Benchmark and compare Context Augmented Generation vs Retrieval Augmented Generation",
     version="1.0.0",
     lifespan=lifespan,
+    root_path=API_ROOT_PATH,
 )
 
 
@@ -81,7 +82,6 @@ class QueryRequest(BaseModel):
 
 class BenchmarkRequest(BaseModel):
     use_judge: bool = True
-    top_k: int = RAG_TOP_K
 
 
 class RetrievedChunk(BaseModel):

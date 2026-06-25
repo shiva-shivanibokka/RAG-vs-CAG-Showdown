@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import numpy as np
 import pytest
@@ -51,3 +51,27 @@ def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_ollama_clien
         mock_st.return_value.encode.return_value = np.random.rand(1, 384).astype("float32")
         engine = RAGEngine(kb, _client=mock_ollama_client)
     assert len(engine.chunks) > 0
+
+
+@pytest.mark.asyncio
+async def test_query_async_returns_correct_keys(tmp_knowledge_base):
+    async_response = MagicMock()
+    async_response.message.content = "async RAG answer"
+    async_response.prompt_eval_count = 120
+    async_response.eval_count = 45
+
+    async_client = MagicMock()
+    async_client.chat = AsyncMock(return_value=async_response)
+
+    with (
+        patch("src.rag.engine.SentenceTransformer") as mock_st,
+        patch("src.rag.engine.AsyncClient", return_value=async_client),
+    ):
+        mock_st.return_value.encode.return_value = np.random.rand(3, 384).astype("float32")
+        engine = RAGEngine(tmp_knowledge_base)
+        result = await engine.query_async("What is KV cache?")
+
+    assert result["answer"] == "async RAG answer"
+    assert result["method"] == "RAG"
+    assert "retrieved_chunks" in result
+    assert "retrieval_latency_seconds" in result

@@ -100,7 +100,7 @@ def test_benchmark_endpoint(client):
     mock_bench.run_async = AsyncMock(return_value=MOCK_BENCHMARK_RESULT)
 
     with patch("api.app.Benchmarker", return_value=mock_bench):
-        response = client.post("/benchmark", json={"use_judge": False, "top_k": 3})
+        response = client.post("/benchmark", json={"use_judge": False})
 
     assert response.status_code == 200
     data = response.json()

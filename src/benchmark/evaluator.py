@@ -182,24 +182,36 @@ class LLMJudge:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
-        try:
-            client = AsyncClient(host=self._ollama_host)
-            response = await client.chat(
-                model=self.judge_model,
-                messages=messages,
-                options={"num_predict": 256},
-            )
-            return self._parse_judge_response(response.message.content)
-        except Exception as exc:
-            logger.warning("Async judge failed: %s", exc)
-            return {
-                "correctness": 0,
-                "completeness": 0,
-                "coherence": 0,
-                "groundedness": 0,
-                "total": 0,
-                "reasoning": f"Judge error: {exc}",
-            }
+        last_exc: Exception | None = None
+        for attempt in range(self._max_retries):
+            try:
+                client = AsyncClient(host=self._ollama_host)
+                response = await client.chat(
+                    model=self.judge_model,
+                    messages=messages,
+                    options={"num_predict": 256},
+                )
+                return self._parse_judge_response(response.message.content)
+            except Exception as exc:
+                last_exc = exc
+                wait = 2**attempt
+                logger.warning(
+                    "Async judge attempt %d/%d failed: %s. Retrying in %ds.",
+                    attempt + 1,
+                    self._max_retries,
+                    exc,
+                    wait,
+                )
+                await asyncio.sleep(wait)
+
+        return {
+            "correctness": 0,
+            "completeness": 0,
+            "coherence": 0,
+            "groundedness": 0,
+            "total": 0,
+            "reasoning": f"Judge error after {self._max_retries} attempts: {last_exc}",
+        }
 
 
 # ---------------------------------------------------------------------------

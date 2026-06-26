@@ -5,12 +5,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Groq — text generation (free tier: 14,400 req/day, much more generous than CF)
-GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
-GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+# Gemini — text generation (free tier: 1,000,000 TPM, 1,500 req/day)
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
-# Cloudflare Workers AI — embeddings only (cheap, stays well within neuron quota)
+# Cloudflare Workers AI — embeddings only
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")
 CF_API_TOKEN: str = os.getenv("CF_API_TOKEN", "")
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "@cf/baai/bge-small-en-v1.5")

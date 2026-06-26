@@ -1,6 +1,6 @@
 """
-CAG Engine — Context Augmented Generation (Groq backend)
-=========================================================
+CAG Engine — Context Augmented Generation (Gemini backend)
+==========================================================
 Loads the entire knowledge base into the LLM context window.
 No retrieval step. No vector database. No chunking.
 """
@@ -11,23 +11,16 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL, MAX_RETRIES, MAX_TOKENS
+from src.config import GEMINI_API_KEY, GEMINI_BASE_URL, GEMINI_MODEL, MAX_RETRIES, MAX_TOKENS
 
 logger = logging.getLogger(__name__)
 
 
 class CAGEngine:
-    """
-    Context Augmented Generation engine backed by Groq.
-
-    The full knowledge base is placed in the system prompt once at startup.
-    Every query sends only the question — the context is already loaded.
-    """
-
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = GROQ_MODEL,
+        model: str = GEMINI_MODEL,
         max_tokens: int = MAX_TOKENS,
         max_retries: int = MAX_RETRIES,
         _client=None,
@@ -36,8 +29,8 @@ class CAGEngine:
         self.max_tokens = max_tokens
         self._max_retries = max_retries
         self._client: OpenAI = _client or OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url=GROQ_BASE_URL,
+            api_key=GEMINI_API_KEY,
+            base_url=GEMINI_BASE_URL,
         )
 
         kb_path = Path(knowledge_base_path)
@@ -75,15 +68,12 @@ class CAGEngine:
                 last_exc = exc
                 wait = 2**attempt
                 logger.warning(
-                    "CF AI call failed (attempt %d/%d): %s. Retrying in %ds.",
-                    attempt + 1,
-                    self._max_retries,
-                    exc,
-                    wait,
+                    "AI call failed (attempt %d/%d): %s. Retrying in %ds.",
+                    attempt + 1, self._max_retries, exc, wait,
                 )
                 time.sleep(wait)
         raise RuntimeError(
-            f"CF AI call failed after {self._max_retries} attempts: {last_exc}"
+            f"AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
     def query(self, question: str) -> dict:
@@ -112,7 +102,7 @@ class CAGEngine:
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
+        async_client = AsyncOpenAI(api_key=GEMINI_API_KEY, base_url=GEMINI_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -136,7 +126,6 @@ class CAGEngine:
         print(f"  CAG Interactive Session  (model: {self.model})")
         print("  Type 'quit' or 'exit' to stop")
         print("=" * 60 + "\n")
-
         while True:
             try:
                 question = input("You: ").strip()
@@ -148,7 +137,6 @@ class CAGEngine:
             if question.lower() in {"quit", "exit", "q"}:
                 print("Goodbye.")
                 break
-
             result = self.query(question)
             print(f"\nCAG: {result['answer']}")
             print(

@@ -18,9 +18,9 @@ from src.config import (
     CF_ACCOUNT_ID,
     CF_API_TOKEN,
     EMBEDDING_MODEL,
-    GROQ_API_KEY,
-    GROQ_BASE_URL,
-    GROQ_MODEL,
+    GEMINI_API_KEY,
+    GEMINI_BASE_URL,
+    GEMINI_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
     RAG_TOP_K,
@@ -73,7 +73,7 @@ class RAGEngine:
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = GROQ_MODEL,
+        model: str = GEMINI_MODEL,
         embedding_model_name: str = EMBEDDING_MODEL,
         top_k: int = RAG_TOP_K,
         max_tokens: int = MAX_TOKENS,
@@ -89,8 +89,8 @@ class RAGEngine:
 
         # In tests _client handles everything; in production use separate clients.
         self._client: OpenAI = _client or OpenAI(
-            api_key=GROQ_API_KEY,
-            base_url=GROQ_BASE_URL,
+            api_key=GEMINI_API_KEY,
+            base_url=GEMINI_BASE_URL,
         )
         self._embed_client: OpenAI = _client or OpenAI(
             api_key=CF_API_TOKEN,
@@ -143,10 +143,18 @@ class RAGEngine:
     def _build_index(self) -> float:
         start = time.perf_counter()
         cache_path = Path(__file__).parent.parent.parent / "knowledge_base" / "embeddings_cache.npy"
+        embeddings = None
         if cache_path.exists():
-            logger.info("RAG | loading pre-computed embeddings from %s", cache_path)
-            embeddings = np.load(str(cache_path))
-        else:
+            cached = np.load(str(cache_path))
+            if cached.shape[0] == len(self.chunks):
+                logger.info("RAG | loading pre-computed embeddings from cache")
+                embeddings = cached
+            else:
+                logger.warning(
+                    "RAG | cache has %d rows but %d chunks — recomputing",
+                    cached.shape[0], len(self.chunks),
+                )
+        if embeddings is None:
             texts = [c["text"] for c in self.chunks]
             logger.info("RAG | embedding %d chunks via CF Workers AI...", len(texts))
             embeddings = self._embed(texts)
@@ -252,7 +260,7 @@ class RAGEngine:
         retrieved_chunks, retrieval_latency = self._retrieve(question)
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
+        async_client = AsyncOpenAI(api_key=GEMINI_API_KEY, base_url=GEMINI_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

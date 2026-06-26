@@ -8,11 +8,32 @@ const SUGGESTIONS = [
   'Compare multi-hop reasoning in CAG vs RAG',
 ]
 
+const KB_TOPICS = [
+  'Transformer Architecture', 'Retrieval Augmented Generation (RAG)',
+  'Context Augmented Generation (CAG)', 'Large Language Models (LLMs)',
+  'Vector Databases & Embeddings', 'Hallucination in LLMs',
+  'Prompt Engineering', 'Fine-Tuning vs In-Context Learning',
+  'Evaluation Metrics for LLMs', 'Agentic AI & Tool Use',
+  'Attention Mechanisms & KV Cache', 'Neural Network Fundamentals',
+  'Tokenization', 'RLHF', 'Encoder / Decoder Architectures',
+  'Chunking Strategies for RAG', 'Mixture of Experts (MoE)',
+  'Constitutional AI & Safety', 'Scaling Laws & Emergent Abilities',
+  'Advanced RAG Techniques', 'Lost-in-the-Middle Problem',
+  'Position Encoding (RoPE, ALiBi)', 'Inference Optimization (vLLM)',
+  'Quantization & Compression', 'Production Deployment Trade-offs',
+  'When RAG Beats CAG', 'Embedding Model Selection & MTEB',
+  'Multi-Hop Reasoning', 'Faithfulness & Hallucination',
+  'Benchmark Evaluation Design',
+]
+
+const LOW_CONFIDENCE_THRESHOLD = 0.30
+
 export default function QueryPanel() {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showTopics, setShowTopics] = useState(false)
 
   const submit = async (q) => {
     const text = q ?? question
@@ -32,6 +53,10 @@ export default function QueryPanel() {
 
   const handleSubmit = (e) => { e.preventDefault(); submit() }
 
+  // RAG retrieval confidence: highest score among retrieved chunks
+  const ragTopScore = result?.rag?.retrieved_chunks?.[0]?.similarity_score ?? null
+  const lowConfidence = ragTopScore !== null && ragTopScore < LOW_CONFIDENCE_THRESHOLD
+
   return (
     <div className="space-y-6">
       {/* heading */}
@@ -41,7 +66,33 @@ export default function QueryPanel() {
             Throw a Challenge
           </span>
         </h2>
-        <p className="text-sm text-gray-500">Both fighters answer simultaneously — may the best AI win</p>
+        <p className="text-sm text-gray-500">
+          Ask about AI/ML topics in the knowledge base — both fighters answer simultaneously
+        </p>
+      </div>
+
+      {/* KB scope callout */}
+      <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-amber-700 font-medium">
+            📚 Knowledge base covers <strong>30 AI/ML topics</strong> — questions outside this scope will get &ldquo;I don&apos;t know&rdquo; answers
+          </p>
+          <button
+            onClick={() => setShowTopics(!showTopics)}
+            className="text-xs text-amber-600 hover:text-amber-800 font-semibold underline ml-3 whitespace-nowrap"
+          >
+            {showTopics ? 'Hide topics' : 'See topics'}
+          </button>
+        </div>
+        {showTopics && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {KB_TOPICS.map((t) => (
+              <span key={t} className="bg-white border border-amber-200 text-amber-800 text-xs px-2 py-0.5 rounded-full">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* input */}
@@ -50,7 +101,7 @@ export default function QueryPanel() {
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Type your question and let the battle begin…"
+          placeholder="e.g. How does vLLM's prefix caching help CAG performance?"
           disabled={loading}
           className="flex-1 rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 transition-all"
         />
@@ -108,10 +159,21 @@ export default function QueryPanel() {
       {/* results */}
       {result && (
         <div className="space-y-4">
-          {/* battle verdict */}
+          {/* low-confidence warning */}
+          {lowConfidence && (
+            <div className="rounded-xl bg-orange-50 border-2 border-orange-200 p-3 flex gap-2 items-start">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <p className="text-orange-700 text-sm font-semibold">Low retrieval confidence (score: {ragTopScore})</p>
+                <p className="text-orange-500 text-xs mt-0.5">
+                  This question may not be well-covered in the knowledge base. Both fighters will likely say they don&apos;t have enough information.
+                </p>
+              </div>
+            </div>
+          )}
+
           <BattleVerdict cag={result.cag} rag={result.rag} />
 
-          {/* answer cards */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <AnswerCard fighter="CAG" color="blue" data={result.cag} />
             <AnswerCard fighter="RAG" color="emerald" data={result.rag} />
@@ -150,7 +212,7 @@ function BattleVerdict({ cag, rag }) {
     <div className="rounded-2xl p-3 text-center bg-gray-50 border border-gray-200">
       <span className="text-sm text-gray-500">
         {cagFaster ? '⚡ CAG was faster' : '⚡ RAG was faster'} &nbsp;·&nbsp;
-        Scores available after running the benchmark with LLM judge
+        Scores only available via the Tournament tab with LLM judge enabled
       </span>
     </div>
   )
@@ -158,16 +220,12 @@ function BattleVerdict({ cag, rag }) {
 
 function AnswerCard({ fighter, color, data }) {
   const isBlue = color === 'blue'
-  const gradient = isBlue
-    ? 'from-blue-600 to-indigo-600'
-    : 'from-emerald-500 to-teal-600'
+  const gradient = isBlue ? 'from-blue-600 to-indigo-600' : 'from-emerald-500 to-teal-600'
   const badge = isBlue ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
   const border = isBlue ? 'border-blue-200' : 'border-emerald-200'
-  const tokenText = isBlue ? 'text-blue-400' : 'text-emerald-400'
 
   return (
     <div className={`rounded-2xl overflow-hidden border-2 ${border} shadow-sm`}>
-      {/* card header */}
       <div className={`bg-gradient-to-r ${gradient} px-5 py-3 flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           <span className="text-white font-black text-base">{fighter}</span>
@@ -179,23 +237,21 @@ function AnswerCard({ fighter, color, data }) {
         </span>
       </div>
 
-      {/* answer body */}
       <div className="bg-white p-5 space-y-3">
         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{data.answer}</p>
 
-        {/* meta row */}
-        <div className={`flex flex-wrap gap-3 text-xs ${tokenText} pt-2 border-t border-gray-100`}>
+        <div className="flex flex-wrap gap-2 text-xs pt-2 border-t border-gray-100">
           <span className={`${badge} px-2 py-0.5 rounded-full font-medium`}>
             in: {data.input_tokens.toLocaleString()} tok
           </span>
           <span className={`${badge} px-2 py-0.5 rounded-full font-medium`}>
             out: {data.output_tokens.toLocaleString()} tok
           </span>
-          {data.retrieved_chunks?.length > 0 && (
-            <span className="bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">
-              🔍 {data.retrieved_chunks.map((c) => c.title).join(', ')}
+          {data.retrieved_chunks?.map((c) => (
+            <span key={c.title} className="bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">
+              🔍 {c.title} <span className="opacity-60">({c.similarity_score})</span>
             </span>
-          )}
+          ))}
         </div>
       </div>
     </div>

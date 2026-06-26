@@ -7,7 +7,7 @@ load_dotenv()
 
 # Groq — text generation (free tier: 14,400 req/day, much more generous than CF)
 GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
 
 # Cloudflare Workers AI — embeddings only (cheap, stays well within neuron quota)

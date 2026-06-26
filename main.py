@@ -9,12 +9,12 @@ Usage:
     python main.py ask rag "..."      Single question via RAG
     python main.py ask both "..."     Ask both and compare side by side
     python main.py benchmark --no-judge   Skip LLM judge scoring (faster)
-    python main.py benchmark --top-k 5    Set RAG top-k chunks (default: 3)
+    python main.py benchmark --top-k 5    Set RAG top-k chunks (default: 5)
 
 Environment variables (see .env):
     OPENAI_API_KEY  API key for the LLM provider (required)
     OPENAI_MODEL    Model to use (default: gpt-4o-mini)
-    RAG_TOP_K       Top-k chunks for RAG (default: 3)
+    RAG_TOP_K       Top-k chunks for RAG (default: 5)
     LOG_LEVEL       Logging verbosity (default: INFO)
 """
 

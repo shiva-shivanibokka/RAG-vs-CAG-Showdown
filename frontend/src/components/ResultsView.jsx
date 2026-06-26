@@ -247,15 +247,6 @@ function DetailCard({ title, color, result }) {
   )
 }
 
-function ScoreRow({ label, value }) {
-  return (
-    <div className="flex justify-between">
-      <span className="opacity-70">{label}</span>
-      <span className="font-bold">{value ?? '—'}</span>
-    </div>
-  )
-}
-
 function KpiCard({ label, value, max, color, icon }) {
   const colors = {
     blue:    { grad: 'from-blue-500 to-indigo-600',   ring: 'ring-blue-100' },

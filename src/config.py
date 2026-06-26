@@ -14,7 +14,7 @@ MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 API_ROOT_PATH: str = os.getenv("API_ROOT_PATH", "")
-CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+
 
 
 def setup_logging() -> None:

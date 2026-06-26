@@ -1,8 +1,14 @@
 # CAG vs RAG Showdown ⚔️
 
-A production-deployed benchmarking arena that pits **Context Augmented Generation (CAG)** against **Retrieval Augmented Generation (RAG)** head-to-head on accuracy, latency, and cost — scored by an LLM judge across 10 AI/ML questions.
+> **Recruiter TL;DR**
+> - Full-stack LLM benchmarking app that pits Context Augmented Generation against Retrieval Augmented Generation head-to-head on 10 AI/ML questions, scored by an LLM-as-judge in real time
+> - Hardest engineering problem: eliminated all cloud embedding dependencies by running a local ONNX model inside Docker after every major free-tier LLM provider failed due to token/rate limits (Groq 12K TPM cap, Cloudflare 10K neurons/day, Gemini regional quota, Cerebras model-access errors, OpenRouter free-model discontinuation, Together AI billing wall)
+> - In a live tournament run: CAG scored **4.95/5 avg** vs RAG's **3.73/5**, with multi-hop questions showing the widest gap (5/5 vs 1.25/5) — at the cost of 30% higher latency (5.03s vs 3.86s), consistent with CAG's larger prompt
 
-**Live demo** → deployed on Render (backend) + Vercel (frontend)
+[![CI](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions/workflows/ci.yml/badge.svg)](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+
+**Live demo** → [rag-vs-cag-showdown.vercel.app](https://rag-vs-cag-showdown.vercel.app/)
 
 ---
 
@@ -22,6 +28,18 @@ A production-deployed benchmarking arena that pits **Context Augmented Generatio
 **When CAG wins:** multi-hop questions, small-to-medium knowledge bases, when consistency matters more than scale.
 
 **When RAG wins:** large corpora, latency-sensitive applications, cost-sensitive high-volume workloads.
+
+---
+
+## Features
+
+- **⚔️ Single Challenge** — ask any question and see CAG and RAG answers side by side with latency and token counts
+- **🏆 Full Tournament** — run all 10 benchmark questions in parallel; an LLM judge scores each answer on correctness, completeness, coherence, and groundedness (1–5 each)
+- **🛡️ Battle HQ** — live backend health check showing model, embedding strategy, and knowledge base status
+- **API key gate** — visitors supply their own LLM key; it goes browser → provider directly, the server never stores it
+- **🔑 Change Key** button in the header to swap keys without a page refresh
+- Per-question latency chart and score chart rendered after each tournament
+- Retrieved chunk titles shown alongside every RAG answer
 
 ---
 
@@ -104,6 +122,31 @@ A **🔑 Change Key** button appears in the top-right corner of the header on ev
 - Same LLM, third role: scores each answer on 4 dimensions (1–5 each)
 - Correctness, Completeness, Coherence, Groundedness
 - Runs in parallel with `asyncio.gather` for speed
+
+---
+
+## Benchmark Results
+
+Results from a full 10-question tournament run (OpenAI gpt-4o-mini):
+
+| Metric | CAG | RAG |
+|---|---|---|
+| Avg judge score | **4.95 / 5** | 3.73 / 5 |
+| Avg latency | 5.03s | 3.86s |
+| Wins | **5** | 0 |
+| Ties | 5 | 5 |
+
+**Where the gap was largest — multi-hop questions:**
+
+| Question | CAG | RAG |
+|---|---|---|
+| Q05: How does tokenization affect CAG's context window? | 5/5 | 1.25/5 |
+| Q06: CAG or RAG for a 50,000-word medical QA system? | 5/5 | 1.25/5 |
+| Q07: Compare encoder/decoder architectures for RAG | 5/5 | 1.25/5 |
+
+Multi-hop questions require synthesizing information across multiple topics simultaneously. CAG has all 30 topics in context; RAG retrieves top-3 chunks and misses the connections between them. This is the clearest demonstration of when each approach wins.
+
+**The latency tradeoff is real:** CAG is ~30% slower on average because it sends ~13,500 tokens on every request. RAG sends ~2,000. If latency matters more than multi-hop accuracy, RAG wins that dimension.
 
 ---
 
@@ -233,6 +276,21 @@ The key is passed in an `X-OpenAI-Key` request header on every API call, used pe
 
 ---
 
+## Skills Demonstrated
+
+| Competency | How it appears in this project |
+|---|---|
+| LLM application development & RAG | CAG and RAG engines built from scratch; LLM-as-judge evaluation loop |
+| RESTful API design | Five typed FastAPI endpoints (`/health`, `/query/cag`, `/query/rag`, `/query/both`, `/benchmark`) with Pydantic request/response models |
+| System design & architecture | Documented CAG vs RAG tradeoff reasoning; fastembed-over-API decision; embeddings-cache-in-git strategy |
+| Asynchronous & concurrent systems | `asyncio.gather` runs CAG, RAG, and judge calls in parallel during tournament; async engine methods throughout |
+| Containerization & Docker | Multi-stage Dockerfile with fastembed ONNX model pre-downloaded at build time to eliminate cold-start latency |
+| CI/CD pipeline | GitHub Actions: ruff lint + pytest on every push and PR (`pip install -e ".[dev]"`, `--cov` report) |
+| Cloud deployment | Render (Docker-based backend) + Vercel (frontend with SPA rewrite rule) |
+| Observability & monitoring | Structured logging (`logging` module throughout), `/health` endpoint reporting model/KB/embedding status |
+
+---
+
 ## Local Development
 
 ### Prerequisites
@@ -242,8 +300,8 @@ The key is passed in an `X-OpenAI-Key` request header on every API call, used pe
 ### Backend
 
 ```bash
-# Install Python dependencies
-pip install -r requirements.txt
+# Install all dependencies including dev tools (linting, testing)
+pip install -e ".[dev]"
 
 # Set your API key (used as fallback if no key sent in header)
 # Windows
@@ -275,7 +333,6 @@ npm run dev
 The cache (`knowledge_base/embeddings_cache.npy`) is already committed. Only needed if you change the knowledge base:
 
 ```bash
-pip install fastembed
 python scripts/precompute_embeddings.py
 # Saves 30 × 384 float32 embeddings to knowledge_base/embeddings_cache.npy
 ```
@@ -283,7 +340,7 @@ python scripts/precompute_embeddings.py
 ### Running tests
 
 ```bash
-pytest tests/ -v
+pytest tests/ -v --cov=src --cov=api --cov-report=term-missing
 # 38 tests covering CAG engine, RAG engine, chunking, evaluator, and API routes
 ```
 
@@ -295,10 +352,9 @@ pytest tests/ -v
 
 1. Connect your GitHub repo on [render.com](https://render.com)
 2. Service type: **Web Service**, environment: **Docker**
-3. Required environment variables (set in Render dashboard):
-   - `CF_ACCOUNT_ID` — only needed if you want CF embeddings (not required with fastembed)
-   - `CF_API_TOKEN` — same as above
+3. Environment variables (set in Render dashboard):
    - `OPENAI_API_KEY` — optional server-side fallback; leave empty to require user-supplied keys
+   - `CORS_ORIGINS` — set to your Vercel frontend URL (e.g. `https://rag-vs-cag-showdown.vercel.app`)
 4. The Docker build pre-downloads the fastembed ONNX model so cold starts are fast
 
 ### Frontend — Vercel
@@ -362,3 +418,7 @@ CAG-vs-RAG-Showdown/
 **Topic-based chunking** — chunks aligned to document structure (one chunk per topic) rather than arbitrary token windows. This improves retrieval precision because each chunk is semantically coherent.
 
 **LLM-as-judge** — avoids expensive human annotation while providing structured, reproducible quality scores. The judge uses the same model as the engines but in a distinct role, scoring each answer independently without comparing them directly.
+
+---
+
+## Roadmap

@@ -5,10 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Cerebras — text generation (free tier: 60K TPM for 8B, 30K TPM for 70B)
-CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")
-CEREBRAS_MODEL: str = os.getenv("CEREBRAS_MODEL", "llama3.1-8b")
-CEREBRAS_BASE_URL: str = "https://api.cerebras.ai/v1"
+# OpenRouter — text generation (free tier, no credit card, global availability)
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
 # Cloudflare Workers AI — embeddings only
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")

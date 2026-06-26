@@ -11,7 +11,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import CEREBRAS_API_KEY, CEREBRAS_BASE_URL, CEREBRAS_MODEL, MAX_RETRIES, MAX_TOKENS
+from src.config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_MODEL, MAX_RETRIES, MAX_TOKENS
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class CAGEngine:
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = CEREBRAS_MODEL,
+        model: str = OPENROUTER_MODEL,
         max_tokens: int = MAX_TOKENS,
         max_retries: int = MAX_RETRIES,
         _client=None,
@@ -29,8 +29,8 @@ class CAGEngine:
         self.max_tokens = max_tokens
         self._max_retries = max_retries
         self._client: OpenAI = _client or OpenAI(
-            api_key=CEREBRAS_API_KEY,
-            base_url=CEREBRAS_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
         )
 
         kb_path = Path(knowledge_base_path)
@@ -102,7 +102,7 @@ class CAGEngine:
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=CEREBRAS_API_KEY, base_url=CEREBRAS_BASE_URL)
+        async_client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

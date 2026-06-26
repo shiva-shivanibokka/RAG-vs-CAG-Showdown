@@ -16,7 +16,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import CEREBRAS_API_KEY, CEREBRAS_BASE_URL, CEREBRAS_MODEL, MAX_RETRIES
+from src.config import OPENROUTER_API_KEY, OPENROUTER_BASE_URL, OPENROUTER_MODEL, MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 
@@ -118,15 +118,15 @@ class LLMJudge:
 
     def __init__(
         self,
-        judge_model: str = CEREBRAS_MODEL,
+        judge_model: str = OPENROUTER_MODEL,
         max_retries: int = MAX_RETRIES,
         _client=None,
     ):
         self.judge_model = judge_model
         self._max_retries = max_retries
         self._client: OpenAI = _client or OpenAI(
-            api_key=CEREBRAS_API_KEY,
-            base_url=CEREBRAS_BASE_URL,
+            api_key=OPENROUTER_API_KEY,
+            base_url=OPENROUTER_BASE_URL,
         )
 
     def _parse_judge_response(self, raw: str) -> dict:
@@ -186,7 +186,7 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                async_client = AsyncOpenAI(api_key=CEREBRAS_API_KEY, base_url=CEREBRAS_BASE_URL)
+                async_client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
                 response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,

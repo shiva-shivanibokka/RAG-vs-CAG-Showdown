@@ -6,7 +6,7 @@ services:
     branch: main
     healthCheckPath: /health
     envVars:
-      - key: CEREBRAS_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false          # set this manually in Render dashboard
       - key: CF_ACCOUNT_ID
         sync: false          # set this manually in Render dashboard — used for embeddings only

@@ -218,7 +218,7 @@ class RAGEngine:
                 )
                 time.sleep(wait)
         raise RuntimeError(
-            f"CF AI call failed after {self._max_retries} attempts"
+            f"CF AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
     # ------------------------------------------------------------------

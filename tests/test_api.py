@@ -23,7 +23,7 @@ MOCK_RAG_RESULT = {
     "output_tokens": 60,
     "model": "gpt-4o-mini",
     "method": "RAG",
-    "context_used": "Top-3 retrieved chunks",
+    "context_used": "Top-5 retrieved chunks",
     "retrieved_chunks": [{"title": "KV Cache", "similarity_score": 0.91}],
 }
 
@@ -32,9 +32,11 @@ MOCK_RAG_RESULT = {
 def client():
     mock_cag = MagicMock()
     mock_cag.query.return_value = MOCK_CAG_RESULT
+    mock_cag.query_async = AsyncMock(return_value=MOCK_CAG_RESULT)
 
     mock_rag = MagicMock()
     mock_rag.query.return_value = MOCK_RAG_RESULT
+    mock_rag.query_async = AsyncMock(return_value=MOCK_RAG_RESULT)
 
     from api.app import app, get_cag, get_rag
 

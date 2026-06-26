@@ -5,6 +5,7 @@ Serves the CAG and RAG engines as HTTP endpoints.
 Run with: uvicorn api.app:app --reload
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,7 +17,7 @@ from pydantic import BaseModel, field_validator
 
 from src.benchmark.evaluator import Benchmarker
 from src.cag.engine import CAGEngine
-from src.config import API_ROOT_PATH, OPENAI_MODEL, RAG_TOP_K
+from src.config import API_ROOT_PATH, CORS_ORIGINS, OPENAI_MODEL, RAG_TOP_K
 from src.rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,11 @@ app = FastAPI(
     root_path=API_ROOT_PATH,
 )
 
+_CORS_ORIGINS = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()] or ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_CORS_ORIGINS,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -155,7 +158,7 @@ def query_rag(req: QueryRequest, request: Request, rag: Annotated[RAGEngine, Dep
 
 
 @app.post("/query/both", response_model=BothQueryResponse)
-def query_both(
+async def query_both(
     req: QueryRequest,
     request: Request,
     cag: Annotated[CAGEngine, Depends(get_cag)],
@@ -163,10 +166,11 @@ def query_both(
 ):
     cfg = _llm_config(request)
     try:
-        return {
-            "cag": cag.query(req.question, llm_config=cfg),
-            "rag": rag.query(req.question, llm_config=cfg),
-        }
+        cag_result, rag_result = await asyncio.gather(
+            cag.query_async(req.question, llm_config=cfg),
+            rag.query_async(req.question, llm_config=cfg),
+        )
+        return {"cag": cag_result, "rag": rag_result}
     except Exception as exc:
         logger.error("Dual query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

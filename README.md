@@ -81,33 +81,36 @@ A **🔑 Change Key** button appears in the top-right corner of the header on ev
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   Vercel (Frontend)                  │
-│   React + Vite + Tailwind CSS                        │
-│   • API key gate (localStorage)                      │
-│   • ⚔️ Challenge tab (single question)               │
-│   • 🏆 Tournament tab (10 questions + LLM judge)     │
-│   • 🛡️ Battle HQ tab (system health)                 │
-└──────────────────┬──────────────────────────────────┘
-                   │ HTTPS  (X-OpenAI-Key header)
-┌──────────────────▼──────────────────────────────────┐
-│                  Render (Backend)                    │
-│   FastAPI + Python 3.11 + Docker                     │
-│                                                      │
-│   ┌─────────────────┐   ┌──────────────────────┐   │
-│   │   CAG Engine    │   │     RAG Engine        │   │
-│   │                 │   │                       │   │
-│   │ Full KB in      │   │ fastembed (local ONNX)│   │
-│   │ system prompt   │   │ → FAISS IndexFlatIP   │   │
-│   │ (~13,500 tok)   │   │ → top-3 chunks        │   │
-│   └────────┬────────┘   └──────────┬────────────┘  │
-│            │                        │               │
-│            └────────────┬───────────┘               │
-│                         │                           │
-│                  LLM API call                       │
-│              (user's key, per-request)              │
-└─────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    Browser["User Browser\nAPI key stored in localStorage"]
+
+    subgraph Vercel["Vercel — Frontend"]
+        React["React 18 + Vite + Tailwind CSS\nChallenge · Tournament · Battle HQ"]
+    end
+
+    subgraph Render["Render — Backend  (Docker · Python 3.11)"]
+        FastAPI["FastAPI\nPOST /query/both · POST /benchmark · GET /health"]
+        CAG["CAG Engine\nFull KB in system prompt\n~13,500 tokens per call"]
+        RAG["RAG Engine\nfastembed ONNX · FAISS IndexFlatIP\ntop-5 chunks · ~2,000 tokens per call"]
+        Judge["LLM Judge\nasyncio.gather scores both answers\ncorrectness · completeness · coherence · groundedness"]
+    end
+
+    LLM["LLM Provider\nuser-supplied key\nOpenAI · Gemini · Cerebras · Groq · OpenRouter"]
+
+    Browser -->|navigate| React
+    React -->|"HTTPS\nX-OpenAI-Key · X-OpenAI-Base-URL · X-OpenAI-Model"| FastAPI
+    FastAPI -->|asyncio.gather| CAG
+    FastAPI -->|asyncio.gather| RAG
+    CAG -->|chat.completions.create| LLM
+    RAG -->|chat.completions.create| LLM
+    LLM --> FastAPI
+    FastAPI -.->|tournament mode only| Judge
+    Judge -->|"score_async x2"| LLM
+    LLM --> Judge
+    Judge --> FastAPI
+    FastAPI -->|JSON response| React
+    React -->|render results| Browser
 ```
 
 ### Key components
@@ -120,38 +123,13 @@ A **🔑 Change Key** button appears in the top-right corner of the header on ev
 **RAG Engine** (`src/rag/engine.py`)
 - Loads pre-computed embeddings from `knowledge_base/embeddings_cache.npy` (30 × 384 float32, committed to git — no API call at startup)
 - At query time: embeds the question locally using **fastembed** (BAAI/bge-small-en-v1.5 ONNX model) — zero API calls, zero rate limits
-- FAISS `IndexFlatIP` cosine similarity → top-3 chunks retrieved
+- FAISS `IndexFlatIP` cosine similarity → top-5 chunks retrieved
 - One LLM call with retrieved context only (~2,000 tokens)
 
 **LLM Judge** (`src/benchmark/evaluator.py`)
 - Same LLM, third role: scores each answer on 4 dimensions (1–5 each)
 - Correctness, Completeness, Coherence, Groundedness
 - Runs in parallel with `asyncio.gather` for speed
-
----
-
-## Benchmark Results
-
-Results from a full 10-question tournament run (OpenAI gpt-4o-mini):
-
-| Metric | CAG | RAG |
-|---|---|---|
-| Avg judge score | **4.95 / 5** | 3.73 / 5 |
-| Avg latency | 5.03s | 3.86s |
-| Wins | **5** | 0 |
-| Ties | 5 | 5 |
-
-**Where the gap was largest — multi-hop questions:**
-
-| Question | CAG | RAG |
-|---|---|---|
-| Q05: How does tokenization affect CAG's context window? | 5/5 | 1.25/5 |
-| Q06: CAG or RAG for a 50,000-word medical QA system? | 5/5 | 1.25/5 |
-| Q07: Compare encoder/decoder architectures for RAG | 5/5 | 1.25/5 |
-
-Multi-hop questions require synthesizing information across multiple topics simultaneously. CAG has all 30 topics in context; RAG retrieves top-3 chunks and misses the connections between them. This is the clearest demonstration of when each approach wins.
-
-**The latency tradeoff is real:** CAG is ~30% slower on average because it sends ~13,500 tokens on every request. RAG sends ~2,000. If latency matters more than multi-hop accuracy, RAG wins that dimension.
 
 ---
 
@@ -351,25 +329,76 @@ pytest tests/ -v --cov=src --cov=api --cov-report=term-missing
 
 ---
 
-## Deployment
+## Deploy from Scratch
 
-### Backend — Render
+This app has two independently deployed pieces: the **backend** (Render, Docker) and the **frontend** (Vercel, static). You need both URLs before either is fully functional, so deploy the backend first, grab its URL, then deploy the frontend pointing at it.
 
-1. Connect your GitHub repo on [render.com](https://render.com)
-2. Service type: **Web Service**, environment: **Docker**
-3. Environment variables (set in Render dashboard):
-   - `OPENAI_API_KEY` — optional server-side fallback; leave empty to require user-supplied keys
-   - `CORS_ORIGINS` — set to your Vercel frontend URL (e.g. `https://rag-vs-cag-showdown.vercel.app`)
-4. The Docker build pre-downloads the fastembed ONNX model so cold starts are fast
+### Prerequisites
 
-### Frontend — Vercel
+- GitHub account (repo forked or cloned and pushed)
+- [Render](https://render.com) account (free tier works)
+- [Vercel](https://vercel.com) account (free tier works)
 
-1. Import the repo on [vercel.com](https://vercel.com)
-2. Framework: **Vite**
-3. Root directory: `frontend`
-4. Environment variable: `VITE_API_URL` = your Render backend URL (e.g. `https://your-app.onrender.com`)
+---
 
-> **Note:** Render free tier spins down after 15 minutes of inactivity. First request after a cold start may take ~30 seconds. The Battle HQ tab shows backend status.
+### Step 1 — Deploy the backend on Render
+
+1. Go to [render.com](https://render.com) → **New** → **Web Service**
+2. Connect your GitHub repo
+3. Configure the service:
+   - **Name:** anything you like (e.g. `cag-vs-rag-api`)
+   - **Environment:** `Docker`
+   - **Branch:** `main`
+   - **Plan:** Free
+4. Under **Environment Variables**, add:
+
+   | Key | Value | Notes |
+   |---|---|---|
+   | `CORS_ORIGINS` | `https://your-app.vercel.app` | Your Vercel URL — **required** to unblock CORS. Set it after step 2 if you don't know it yet; until then the frontend can't call the backend. |
+   | `OPENAI_API_KEY` | *(leave blank)* | Optional server-side fallback. Leave empty — the app is designed for users to supply their own keys. |
+
+5. Click **Deploy**. The first build takes ~3–5 minutes — Docker pulls Python 3.11, installs dependencies, and pre-downloads the fastembed ONNX model (~22 MB).
+6. Once deployed, note the URL: `https://your-service-name.onrender.com`
+7. Test: `curl https://your-service-name.onrender.com/health` should return `{"status":"ok","model":"gpt-4o-mini","provider":"OpenAI"}`
+
+> **Render free tier** spins the service down after 15 minutes of inactivity. The first request after a cold start takes ~30 seconds while the container restarts. The Battle HQ tab in the frontend shows the current backend status and warns when it's warming up.
+
+---
+
+### Step 2 — Deploy the frontend on Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import your GitHub repo
+2. Configure:
+   - **Framework Preset:** Vite
+   - **Root Directory:** `frontend`
+3. Under **Environment Variables**, add:
+
+   | Key | Value |
+   |---|---|
+   | `VITE_API_URL` | `https://your-service-name.onrender.com` |
+
+4. Click **Deploy**. Build takes ~1 minute.
+5. Note your Vercel URL (e.g. `https://rag-vs-cag-showdown.vercel.app`)
+
+---
+
+### Step 3 — Wire up CORS
+
+Go back to the Render dashboard → your service → **Environment** → update `CORS_ORIGINS` to the exact Vercel URL from Step 2 (no trailing slash). Render redeploys automatically.
+
+> If you skip this step, the browser will block all API calls with a CORS error.
+
+---
+
+### Step 4 — Verify end-to-end
+
+1. Open your Vercel URL in a browser
+2. Select a provider and enter an API key
+3. Click **Battle HQ** — it should show `🟢 Battle Servers ONLINE`
+4. Go to **Challenge**, pick any topic, click **Fight!**
+5. Both CAG and RAG answers should appear within 5–15 seconds
+
+> **Already have the repo?** The `render.yaml` in the root pre-configures Render — connect your repo and Render will detect it automatically. You still need to set `CORS_ORIGINS` manually since it depends on your Vercel URL.
 
 ---
 
@@ -381,7 +410,7 @@ CAG-vs-RAG-Showdown/
 │   └── app.py                         # FastAPI routes
 ├── src/
 │   ├── cag/engine.py                  # CAGEngine — full KB in context
-│   ├── rag/engine.py                  # RAGEngine — fastembed + FAISS + retrieval
+│   ├── rag/engine.py                  # RAGEngine — fastembed + FAISS + top-5 chunk retrieval
 │   ├── benchmark/evaluator.py         # Benchmarker + LLMJudge
 │   └── config.py                      # Environment variable loading
 ├── frontend/

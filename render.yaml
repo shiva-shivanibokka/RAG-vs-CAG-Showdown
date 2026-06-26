@@ -7,15 +7,11 @@ services:
     healthCheckPath: /health
     envVars:
       - key: OPENAI_API_KEY
-        sync: false          # set this manually in Render dashboard
-      - key: CF_ACCOUNT_ID
-        sync: false          # set this manually in Render dashboard — used for embeddings only
-      - key: CF_API_TOKEN
-        sync: false          # set this manually in Render dashboard — used for embeddings only
-      - key: EMBEDDING_MODEL
-        value: "@cf/baai/bge-small-en-v1.5"
+        sync: false          # optional server-side fallback; leave empty to require user-supplied keys
+      - key: CORS_ORIGINS
+        sync: false          # set to your Vercel URL, e.g. https://rag-vs-cag-showdown.vercel.app
       - key: RAG_TOP_K
-        value: "3"
+        value: "5"
       - key: MAX_TOKENS
         value: "1024"
       - key: MAX_RETRIES
@@ -24,5 +20,3 @@ services:
         value: "INFO"
       - key: API_ROOT_PATH
         value: ""
-      - key: CORS_ORIGINS
-        sync: false          # set to your Vercel URL in Render dashboard

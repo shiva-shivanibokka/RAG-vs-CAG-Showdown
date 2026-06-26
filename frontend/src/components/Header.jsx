@@ -128,7 +128,7 @@ function RagRobot() {
   )
 }
 
-export default function Header() {
+export default function Header({ onClearKey }) {
   return (
     <header className="relative overflow-hidden bg-gradient-to-b from-indigo-950 via-slate-900 to-slate-800">
       {/* stars */}
@@ -194,6 +194,18 @@ export default function Header() {
 
         </div>
       </div>
+
+      {/* change key button */}
+      {onClearKey && (
+        <div className="absolute top-3 right-4">
+          <button
+            onClick={onClearKey}
+            className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 px-3 py-1 rounded-lg transition-colors"
+          >
+            🔑 Change Key
+          </button>
+        </div>
+      )}
 
       {/* ground strip */}
       <div className="relative h-5 bg-gradient-to-r from-green-800 via-green-600 to-green-800 border-t-4 border-green-500 mt-2">

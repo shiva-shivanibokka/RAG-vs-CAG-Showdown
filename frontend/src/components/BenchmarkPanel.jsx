@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { runBenchmark } from '../api'
 import ResultsView from './ResultsView'
 
-export default function BenchmarkPanel() {
+export default function BenchmarkPanel({ apiKey }) {
   const [useJudge, setUseJudge] = useState(true)
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -13,7 +13,7 @@ export default function BenchmarkPanel() {
     setError(null)
     setResults(null)
     try {
-      const data = await runBenchmark(useJudge)
+      const data = await runBenchmark(useJudge, apiKey)
       setResults(data)
     } catch (err) {
       setError(err.message)

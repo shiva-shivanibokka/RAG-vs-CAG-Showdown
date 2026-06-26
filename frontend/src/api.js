@@ -1,8 +1,11 @@
 const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
-async function request(path, options = {}) {
+async function request(path, options = {}, apiKey = '') {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(apiKey ? { 'X-OpenAI-Key': apiKey } : {}),
+    },
     ...options,
   })
   if (!res.ok) {
@@ -14,14 +17,14 @@ async function request(path, options = {}) {
 
 export const getHealth = () => request('/health')
 
-export const queryBoth = (question) =>
+export const queryBoth = (question, apiKey) =>
   request('/query/both', {
     method: 'POST',
     body: JSON.stringify({ question }),
-  })
+  }, apiKey)
 
-export const runBenchmark = (useJudge = true) =>
+export const runBenchmark = (useJudge = true, apiKey) =>
   request('/benchmark', {
     method: 'POST',
     body: JSON.stringify({ use_judge: useJudge }),
-  })
+  }, apiKey)

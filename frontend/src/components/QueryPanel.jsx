@@ -36,7 +36,7 @@ const KB_TOPICS = [
 
 const LOW_CONFIDENCE_THRESHOLD = 0.30
 
-export default function QueryPanel() {
+export default function QueryPanel({ apiKey }) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -50,7 +50,7 @@ export default function QueryPanel() {
     setError(null)
     setResult(null)
     try {
-      const data = await queryBoth(text)
+      const data = await queryBoth(text, apiKey)
       setResult(data)
     } catch (err) {
       setError(err.message)

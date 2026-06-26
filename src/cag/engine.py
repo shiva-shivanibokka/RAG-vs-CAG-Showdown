@@ -52,11 +52,12 @@ class CAGEngine:
             f"========== KNOWLEDGE BASE ==========\n{self._kb_text}\n====================================="
         )
 
-    def _chat(self, messages: list[dict]) -> object:
+    def _chat(self, messages: list[dict], client=None) -> object:
+        c = client or self._client
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                return self._client.chat.completions.create(
+                return c.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     max_tokens=self.max_tokens,
@@ -73,13 +74,14 @@ class CAGEngine:
             f"AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
-    def query(self, question: str) -> dict:
+    def query(self, question: str, api_key: str | None = None) -> dict:
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        response = self._chat(messages)
+        client = OpenAI(api_key=api_key) if api_key else self._client
+        response = self._chat(messages, client=client)
         latency = time.perf_counter() - start
 
         return {
@@ -93,13 +95,13 @@ class CAGEngine:
             "retrieved_chunks": None,
         }
 
-    async def query_async(self, question: str) -> dict:
+    async def query_async(self, question: str, api_key: str | None = None) -> dict:
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        async_client = AsyncOpenAI(api_key=api_key or OPENAI_API_KEY)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

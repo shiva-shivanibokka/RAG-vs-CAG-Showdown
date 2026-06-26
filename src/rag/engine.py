@@ -201,11 +201,12 @@ class RAGEngine:
             {"role": "user", "content": f"CONTEXT:\n{context}\n\nQUESTION: {question}"},
         ]
 
-    def _chat(self, messages: list[dict]) -> object:
+    def _chat(self, messages: list[dict], client=None) -> object:
+        c = client or self._client
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                return self._client.chat.completions.create(
+                return c.chat.completions.create(
                     model=self.model,
                     messages=messages,
                     max_tokens=self.max_tokens,
@@ -226,12 +227,13 @@ class RAGEngine:
     # Public interface
     # ------------------------------------------------------------------
 
-    def query(self, question: str) -> dict:
+    def query(self, question: str, api_key: str | None = None) -> dict:
         total_start = time.perf_counter()
         retrieved_chunks, retrieval_latency = self._retrieve(question)
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        response = self._chat(messages)
+        client = OpenAI(api_key=api_key) if api_key else None
+        response = self._chat(messages, client=client)
         generation_latency = time.perf_counter() - gen_start
         total_latency = time.perf_counter() - total_start
 
@@ -251,12 +253,12 @@ class RAGEngine:
             ],
         }
 
-    async def query_async(self, question: str) -> dict:
+    async def query_async(self, question: str, api_key: str | None = None) -> dict:
         total_start = time.perf_counter()
         retrieved_chunks, retrieval_latency = self._retrieve(question)
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+        async_client = AsyncOpenAI(api_key=api_key or OPENAI_API_KEY)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

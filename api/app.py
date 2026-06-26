@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
 
@@ -56,7 +56,7 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Dependency injection (enables test overrides)
+# Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -72,8 +72,12 @@ def get_rag() -> RAGEngine:
     return _rag
 
 
+def _api_key(request: Request) -> str | None:
+    return request.headers.get("X-OpenAI-Key") or None
+
+
 # ---------------------------------------------------------------------------
-# Request / Response schemas
+# Schemas
 # ---------------------------------------------------------------------------
 
 
@@ -126,18 +130,18 @@ def health():
 
 
 @app.post("/query/cag", response_model=QueryResponse)
-def query_cag(req: QueryRequest, cag: Annotated[CAGEngine, Depends(get_cag)]):
+def query_cag(req: QueryRequest, request: Request, cag: Annotated[CAGEngine, Depends(get_cag)]):
     try:
-        return cag.query(req.question)
+        return cag.query(req.question, api_key=_api_key(request))
     except Exception as exc:
         logger.error("CAG query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.post("/query/rag", response_model=QueryResponse)
-def query_rag(req: QueryRequest, rag: Annotated[RAGEngine, Depends(get_rag)]):
+def query_rag(req: QueryRequest, request: Request, rag: Annotated[RAGEngine, Depends(get_rag)]):
     try:
-        return rag.query(req.question)
+        return rag.query(req.question, api_key=_api_key(request))
     except Exception as exc:
         logger.error("RAG query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -146,11 +150,16 @@ def query_rag(req: QueryRequest, rag: Annotated[RAGEngine, Depends(get_rag)]):
 @app.post("/query/both", response_model=BothQueryResponse)
 def query_both(
     req: QueryRequest,
+    request: Request,
     cag: Annotated[CAGEngine, Depends(get_cag)],
     rag: Annotated[RAGEngine, Depends(get_rag)],
 ):
+    key = _api_key(request)
     try:
-        return {"cag": cag.query(req.question), "rag": rag.query(req.question)}
+        return {
+            "cag": cag.query(req.question, api_key=key),
+            "rag": rag.query(req.question, api_key=key),
+        }
     except Exception as exc:
         logger.error("Dual query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -159,6 +168,7 @@ def query_both(
 @app.post("/benchmark")
 async def run_benchmark(
     req: BenchmarkRequest,
+    request: Request,
     cag: Annotated[CAGEngine, Depends(get_cag)],
     rag: Annotated[RAGEngine, Depends(get_rag)],
 ):
@@ -168,6 +178,7 @@ async def run_benchmark(
             rag_engine=rag,
             use_judge=req.use_judge,
             results_dir=Path(__file__).parent.parent / "results",
+            api_key=_api_key(request),
         )
         return await bench.run_async(verbose=False)
     except Exception as exc:

@@ -114,17 +114,19 @@ _REQUIRED_FIELDS = {"correctness", "completeness", "coherence", "groundedness"}
 
 
 class LLMJudge:
-    """Scores answers using Cloudflare Workers AI as an LLM judge."""
+    """Scores answers using an LLM judge."""
 
     def __init__(
         self,
         judge_model: str = OPENAI_MODEL,
         max_retries: int = MAX_RETRIES,
+        api_key: str | None = None,
         _client=None,
     ):
         self.judge_model = judge_model
         self._max_retries = max_retries
-        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY)
+        self._api_key = api_key
+        self._client: OpenAI = _client or OpenAI(api_key=api_key or OPENAI_API_KEY)
 
     def _parse_judge_response(self, raw: str) -> dict:
         """Strip markdown fences, parse JSON, validate required fields, add total."""
@@ -230,13 +232,15 @@ class Benchmarker:
         questions: list[dict] | None = None,
         use_judge: bool = True,
         results_dir: str | Path = "results",
+        api_key: str | None = None,
     ):
         self.cag = cag_engine
         self.rag = rag_engine
         self.questions = questions or DEFAULT_QUESTIONS
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(parents=True, exist_ok=True)
-        self.judge: LLMJudge | None = LLMJudge() if use_judge else None
+        self._api_key = api_key
+        self.judge: LLMJudge | None = LLMJudge(api_key=api_key) if use_judge else None
 
     # ------------------------------------------------------------------
     # Sync run
@@ -257,8 +261,8 @@ class Benchmarker:
                     f"  Q: {q['question'][:80]}{'...' if len(q['question']) > 80 else ''}"
                 )
 
-            cag_result = self.cag.query(q["question"])
-            rag_result = self.rag.query(q["question"])
+            cag_result = self.cag.query(q["question"], api_key=self._api_key)
+            rag_result = self.rag.query(q["question"], api_key=self._api_key)
 
             cag_scores, rag_scores = {}, {}
             if self.judge:
@@ -293,8 +297,8 @@ class Benchmarker:
                 )
 
             cag_result, rag_result = await asyncio.gather(
-                self.cag.query_async(q["question"]),
-                self.rag.query_async(q["question"]),
+                self.cag.query_async(q["question"], api_key=self._api_key),
+                self.rag.query_async(q["question"], api_key=self._api_key),
             )
 
             cag_scores, rag_scores = {}, {}

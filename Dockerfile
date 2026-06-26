@@ -2,20 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install build deps for faiss-cpu
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    curl \
+# curl for healthcheck probes; no gcc/g++ needed — fastembed and faiss-cpu ship pre-built wheels
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
 RUN pip install --no-cache-dir -e .
 
-# Pre-download the embedding model so cold starts don't re-download it
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+# Pre-download ONNX embedding model (~25 MB) so cold starts don't re-download it
+RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 
-# Copy source after deps so layer is cached
 COPY . .
 
 EXPOSE 8000

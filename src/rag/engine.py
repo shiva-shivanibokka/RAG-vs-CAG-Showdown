@@ -1,7 +1,7 @@
 """
 RAG Engine — Retrieval Augmented Generation (Cloudflare Workers AI backend)
 ===========================================================================
-1. Index: chunk -> embed (sentence-transformers) -> FAISS
+1. Index: chunk -> embed (fastembed / ONNX, no PyTorch) -> FAISS
 2. Query: embed question -> top-k retrieval -> Cloudflare AI generation
 """
 
@@ -12,8 +12,8 @@ from pathlib import Path
 
 import faiss
 import numpy as np
+from fastembed import TextEmbedding
 from openai import AsyncOpenAI, OpenAI
-from sentence_transformers import SentenceTransformer
 
 from src.config import (
     CF_ACCOUNT_ID,
@@ -111,7 +111,7 @@ class RAGEngine:
             raise FileNotFoundError(f"Knowledge base not found: {kb_path}")
 
         logger.info("RAG | loading embedding model: %s", embedding_model_name)
-        self.embedder = SentenceTransformer(embedding_model_name)
+        self.embedder = TextEmbedding(embedding_model_name)
 
         raw_text = kb_path.read_text(encoding="utf-8")
         self.chunks = self._chunk(raw_text, chunking_strategy)
@@ -146,9 +146,7 @@ class RAGEngine:
     def _build_index(self) -> float:
         start = time.perf_counter()
         texts = [c["text"] for c in self.chunks]
-        embeddings = self.embedder.encode(
-            texts, show_progress_bar=False, convert_to_numpy=True
-        )
+        embeddings = np.array(list(self.embedder.embed(texts)))
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         self._embeddings = embeddings / np.maximum(norms, 1e-10)
         dim = self._embeddings.shape[1]
@@ -162,7 +160,7 @@ class RAGEngine:
 
     def _retrieve(self, question: str) -> tuple[list[dict], float]:
         start = time.perf_counter()
-        q_emb = self.embedder.encode([question], convert_to_numpy=True)
+        q_emb = np.array(list(self.embedder.embed([question])))
         q_norm = q_emb / np.maximum(
             np.linalg.norm(q_emb, axis=1, keepdims=True), 1e-10
         )

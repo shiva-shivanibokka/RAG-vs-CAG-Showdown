@@ -142,9 +142,14 @@ class RAGEngine:
 
     def _build_index(self) -> float:
         start = time.perf_counter()
-        texts = [c["text"] for c in self.chunks]
-        logger.info("RAG | embedding %d chunks via CF Workers AI...", len(texts))
-        embeddings = self._embed(texts)
+        cache_path = Path(__file__).parent.parent.parent / "knowledge_base" / "embeddings_cache.npy"
+        if cache_path.exists():
+            logger.info("RAG | loading pre-computed embeddings from %s", cache_path)
+            embeddings = np.load(str(cache_path))
+        else:
+            texts = [c["text"] for c in self.chunks]
+            logger.info("RAG | embedding %d chunks via CF Workers AI...", len(texts))
+            embeddings = self._embed(texts)
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         self._embeddings = embeddings / np.maximum(norms, 1e-10)
         dim = self._embeddings.shape[1]

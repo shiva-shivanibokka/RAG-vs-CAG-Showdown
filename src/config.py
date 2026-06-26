@@ -7,7 +7,7 @@ load_dotenv()
 
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")
 CF_API_TOKEN: str = os.getenv("CF_API_TOKEN", "")
-CF_MODEL: str = os.getenv("CF_MODEL", "@cf/meta/llama-3.1-8b-instruct")
+CF_MODEL: str = os.getenv("CF_MODEL", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")
 EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "@cf/baai/bge-small-en-v1.5")
 RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "3"))
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))

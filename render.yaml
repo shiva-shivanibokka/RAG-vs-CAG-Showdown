@@ -11,7 +11,7 @@ services:
       - key: CF_API_TOKEN
         sync: false          # set this manually in Render dashboard
       - key: CF_MODEL
-        value: "@cf/meta/llama-3.1-8b-instruct"
+        value: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
       - key: EMBEDDING_MODEL
         value: "@cf/baai/bge-small-en-v1.5"
       - key: RAG_TOP_K

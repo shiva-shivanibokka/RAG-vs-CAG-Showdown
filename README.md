@@ -49,12 +49,15 @@ When you open the app you'll see an **API Key Gate** before the main interface. 
 
 ### Supported providers
 
+All providers use the same OpenAI-compatible REST API format. The app sends `X-OpenAI-Base-URL` and `X-OpenAI-Model` headers per request — no custom wrappers.
+
 | Provider | Works? | Notes |
 |---|---|---|
-| **OpenAI** (any tier) | ✅ | Recommended. No per-request token cap. Get key at platform.openai.com |
-| **Anthropic** | ✅ | 200K context window. Get key at console.anthropic.com |
-| **Google Gemini free** | ✅ | 1 million TPM — easily handles the 13,500-token CAG prompt. Get key at aistudio.google.com |
-| **Groq free tier** | ⚠️ | Hard 12,000 TPM cap per minute. CAG needs 13,500 tokens → will fail. RAG-only still works. |
+| **OpenAI** | ✅ | Recommended. No per-request token cap. `gpt-4o-mini` / `gpt-4o`. |
+| **Google Gemini** | ✅ | `gemini-2.0-flash` free tier has 1M TPM — handles CAG easily. Get key at aistudio.google.com |
+| **Cerebras** | ✅ | Ultra-fast inference, free tier. `llama3.3-70b` / `llama3.1-8b`. Get key at cloud.cerebras.ai |
+| **OpenRouter** | ✅ | Model marketplace. Paid models only (free models change without notice). |
+| **Groq free tier** | ⚠️ | Hard 12,000 TPM cap. CAG needs 13,500 tokens → will fail. RAG-only still works. |
 | Any provider with < 14K token per-request limit | ❌ | CAG will be rejected at the provider level |
 
 > **Why 13,500 tokens?** CAG loads all 30 knowledge base topics into a single LLM call. That's the cost of the "no retrieval" approach — the provider must accept one large request.
@@ -271,7 +274,7 @@ The key is passed in an `X-OpenAI-Key` request header on every API call, used pe
 | Deployment | Render (backend, Docker free tier), Vercel (frontend) |
 | Embeddings | fastembed — BAAI/bge-small-en-v1.5 (local ONNX, no API) |
 | Vector search | FAISS `IndexFlatIP` (in-memory cosine similarity) |
-| LLM | User-supplied key — OpenAI, Anthropic, Gemini, or compatible |
+| LLM | User-supplied key — OpenAI, Gemini, Cerebras, OpenRouter, Groq (OpenAI-compatible) |
 | Embedding cache | NumPy `.npy` file committed to git (30 × 384 float32) |
 
 ---

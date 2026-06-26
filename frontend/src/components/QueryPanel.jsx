@@ -36,7 +36,7 @@ const KB_TOPICS = [
 
 const LOW_CONFIDENCE_THRESHOLD = 0.30
 
-export default function QueryPanel({ apiKey }) {
+export default function QueryPanel({ llmConfig }) {
   const [question, setQuestion] = useState('')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -50,7 +50,7 @@ export default function QueryPanel({ apiKey }) {
     setError(null)
     setResult(null)
     try {
-      const data = await queryBoth(text, apiKey)
+      const data = await queryBoth(text, llmConfig)
       setResult(data)
     } catch (err) {
       setError(err.message)
@@ -154,26 +154,13 @@ export default function QueryPanel({ apiKey }) {
 
       {/* error */}
       {error && (
-        /neuron|daily.*alloc|alloc.*daily/i.test(error) ? (
-          <div className="rounded-xl bg-amber-50 border-2 border-amber-300 p-4 flex gap-3 items-start">
-            <span className="text-2xl">☕</span>
-            <div>
-              <p className="text-amber-800 font-bold text-sm">Daily AI limit reached</p>
-              <p className="text-amber-700 text-xs mt-1 leading-relaxed">
-                Cloudflare Workers AI gives 10,000 free compute units per day. Today&apos;s quota is used up.
-                The limit resets at <strong>midnight UTC</strong> — come back then and everything will work again.
-              </p>
-            </div>
+        <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4 text-red-600 text-sm flex gap-2 items-start">
+          <span className="text-xl">💥</span>
+          <div>
+            <p className="font-semibold">Battle error!</p>
+            <p className="text-red-400 text-xs mt-0.5">{error}</p>
           </div>
-        ) : (
-          <div className="rounded-xl bg-red-50 border-2 border-red-200 p-4 text-red-600 text-sm flex gap-2 items-start">
-            <span className="text-xl">💥</span>
-            <div>
-              <p className="font-semibold">Battle error!</p>
-              <p className="text-red-400 text-xs mt-0.5">{error}</p>
-            </div>
-          </div>
-        )
+        </div>
       )}
 
       {/* results */}

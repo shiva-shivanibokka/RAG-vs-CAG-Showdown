@@ -52,13 +52,14 @@ class CAGEngine:
             f"========== KNOWLEDGE BASE ==========\n{self._kb_text}\n====================================="
         )
 
-    def _chat(self, messages: list[dict], client=None) -> object:
+    def _chat(self, messages: list[dict], client=None, model: str | None = None) -> object:
         c = client or self._client
+        m = model or self.model
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
                 return c.chat.completions.create(
-                    model=self.model,
+                    model=m,
                     messages=messages,
                     max_tokens=self.max_tokens,
                 )
@@ -74,14 +75,22 @@ class CAGEngine:
             f"AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
-    def query(self, question: str, api_key: str | None = None) -> dict:
+    def query(self, question: str, llm_config: dict | None = None) -> dict:
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        client = OpenAI(api_key=api_key) if api_key else self._client
-        response = self._chat(messages, client=client)
+        if llm_config:
+            kwargs: dict = {"api_key": llm_config["key"]}
+            if llm_config.get("base_url"):
+                kwargs["base_url"] = llm_config["base_url"]
+            client = OpenAI(**kwargs)
+            model = llm_config.get("model") or self.model
+        else:
+            client = None
+            model = self.model
+        response = self._chat(messages, client=client, model=model)
         latency = time.perf_counter() - start
 
         return {
@@ -89,21 +98,25 @@ class CAGEngine:
             "latency_seconds": round(latency, 3),
             "input_tokens": response.usage.prompt_tokens if response.usage else 0,
             "output_tokens": response.usage.completion_tokens if response.usage else 0,
-            "model": self.model,
+            "model": model,
             "method": "CAG",
             "context_used": "Full knowledge base (no retrieval)",
             "retrieved_chunks": None,
         }
 
-    async def query_async(self, question: str, api_key: str | None = None) -> dict:
+    async def query_async(self, question: str, llm_config: dict | None = None) -> dict:
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=api_key or OPENAI_API_KEY)
+        kwargs: dict = {"api_key": (llm_config["key"] if llm_config else None) or OPENAI_API_KEY}
+        if llm_config and llm_config.get("base_url"):
+            kwargs["base_url"] = llm_config["base_url"]
+        async_client = AsyncOpenAI(**kwargs)
+        model = (llm_config.get("model") if llm_config else None) or self.model
         response = await async_client.chat.completions.create(
-            model=self.model,
+            model=model,
             messages=messages,
             max_tokens=self.max_tokens,
         )
@@ -114,7 +127,7 @@ class CAGEngine:
             "latency_seconds": round(latency, 3),
             "input_tokens": response.usage.prompt_tokens if response.usage else 0,
             "output_tokens": response.usage.completion_tokens if response.usage else 0,
-            "model": self.model,
+            "model": model,
             "method": "CAG",
             "context_used": "Full knowledge base (no retrieval)",
             "retrieved_chunks": None,

@@ -120,13 +120,20 @@ class LLMJudge:
         self,
         judge_model: str = OPENAI_MODEL,
         max_retries: int = MAX_RETRIES,
-        api_key: str | None = None,
+        llm_config: dict | None = None,
         _client=None,
     ):
         self.judge_model = judge_model
         self._max_retries = max_retries
-        self._api_key = api_key
-        self._client: OpenAI = _client or OpenAI(api_key=api_key or OPENAI_API_KEY or "not-configured")
+        self._llm_config = llm_config
+        if _client:
+            self._client: OpenAI = _client
+        else:
+            _key = (llm_config["key"] if llm_config else None) or OPENAI_API_KEY or "not-configured"
+            _kwargs: dict = {"api_key": _key}
+            if llm_config and llm_config.get("base_url"):
+                _kwargs["base_url"] = llm_config["base_url"]
+            self._client = OpenAI(**_kwargs)
 
     def _parse_judge_response(self, raw: str) -> dict:
         """Strip markdown fences, parse JSON, validate required fields, add total."""
@@ -148,11 +155,12 @@ class LLMJudge:
             {"role": "user", "content": user},
         ]
 
+        model = (self._llm_config.get("model") if self._llm_config else None) or self.judge_model
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
                 response = self._client.chat.completions.create(
-                    model=self.judge_model,
+                    model=model,
                     messages=messages,
                     max_tokens=256,
                 )
@@ -182,12 +190,17 @@ class LLMJudge:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
+        _key = (self._llm_config["key"] if self._llm_config else None) or OPENAI_API_KEY or "not-configured"
+        _kwargs: dict = {"api_key": _key}
+        if self._llm_config and self._llm_config.get("base_url"):
+            _kwargs["base_url"] = self._llm_config["base_url"]
+        async_client = AsyncOpenAI(**_kwargs)
+        model = (self._llm_config.get("model") if self._llm_config else None) or self.judge_model
         last_exc: Exception | None = None
-        async_client = AsyncOpenAI(api_key=self._api_key or OPENAI_API_KEY or "not-configured")
         for attempt in range(self._max_retries):
             try:
                 response = await async_client.chat.completions.create(
-                    model=self.judge_model,
+                    model=model,
                     messages=messages,
                     max_tokens=256,
                 )
@@ -232,15 +245,15 @@ class Benchmarker:
         questions: list[dict] | None = None,
         use_judge: bool = True,
         results_dir: str | Path = "results",
-        api_key: str | None = None,
+        llm_config: dict | None = None,
     ):
         self.cag = cag_engine
         self.rag = rag_engine
         self.questions = questions or DEFAULT_QUESTIONS
         self.results_dir = Path(results_dir)
         self.results_dir.mkdir(parents=True, exist_ok=True)
-        self._api_key = api_key
-        self.judge: LLMJudge | None = LLMJudge(api_key=api_key) if use_judge else None
+        self._llm_config = llm_config
+        self.judge: LLMJudge | None = LLMJudge(llm_config=llm_config) if use_judge else None
 
     # ------------------------------------------------------------------
     # Sync run
@@ -261,8 +274,8 @@ class Benchmarker:
                     f"  Q: {q['question'][:80]}{'...' if len(q['question']) > 80 else ''}"
                 )
 
-            cag_result = self.cag.query(q["question"], api_key=self._api_key)
-            rag_result = self.rag.query(q["question"], api_key=self._api_key)
+            cag_result = self.cag.query(q["question"], llm_config=self._llm_config)
+            rag_result = self.rag.query(q["question"], llm_config=self._llm_config)
 
             cag_scores, rag_scores = {}, {}
             if self.judge:
@@ -297,8 +310,8 @@ class Benchmarker:
                 )
 
             cag_result, rag_result = await asyncio.gather(
-                self.cag.query_async(q["question"], api_key=self._api_key),
-                self.rag.query_async(q["question"], api_key=self._api_key),
+                self.cag.query_async(q["question"], llm_config=self._llm_config),
+                self.rag.query_async(q["question"], llm_config=self._llm_config),
             )
 
             cag_scores, rag_scores = {}, {}

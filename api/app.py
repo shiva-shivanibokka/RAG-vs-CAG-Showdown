@@ -72,8 +72,15 @@ def get_rag() -> RAGEngine:
     return _rag
 
 
-def _api_key(request: Request) -> str | None:
-    return request.headers.get("X-OpenAI-Key") or None
+def _llm_config(request: Request) -> dict | None:
+    key = request.headers.get("X-OpenAI-Key") or None
+    if not key:
+        return None
+    return {
+        "key": key,
+        "base_url": request.headers.get("X-OpenAI-Base-URL") or None,
+        "model": request.headers.get("X-OpenAI-Model") or None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +139,7 @@ def health():
 @app.post("/query/cag", response_model=QueryResponse)
 def query_cag(req: QueryRequest, request: Request, cag: Annotated[CAGEngine, Depends(get_cag)]):
     try:
-        return cag.query(req.question, api_key=_api_key(request))
+        return cag.query(req.question, llm_config=_llm_config(request))
     except Exception as exc:
         logger.error("CAG query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -141,7 +148,7 @@ def query_cag(req: QueryRequest, request: Request, cag: Annotated[CAGEngine, Dep
 @app.post("/query/rag", response_model=QueryResponse)
 def query_rag(req: QueryRequest, request: Request, rag: Annotated[RAGEngine, Depends(get_rag)]):
     try:
-        return rag.query(req.question, api_key=_api_key(request))
+        return rag.query(req.question, llm_config=_llm_config(request))
     except Exception as exc:
         logger.error("RAG query failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -154,11 +161,11 @@ def query_both(
     cag: Annotated[CAGEngine, Depends(get_cag)],
     rag: Annotated[RAGEngine, Depends(get_rag)],
 ):
-    key = _api_key(request)
+    cfg = _llm_config(request)
     try:
         return {
-            "cag": cag.query(req.question, api_key=key),
-            "rag": rag.query(req.question, api_key=key),
+            "cag": cag.query(req.question, llm_config=cfg),
+            "rag": rag.query(req.question, llm_config=cfg),
         }
     except Exception as exc:
         logger.error("Dual query failed: %s", exc)
@@ -178,7 +185,7 @@ async def run_benchmark(
             rag_engine=rag,
             use_judge=req.use_judge,
             results_dir=Path(__file__).parent.parent / "results",
-            api_key=_api_key(request),
+            llm_config=_llm_config(request),
         )
         return await bench.run_async(verbose=False)
     except Exception as exc:

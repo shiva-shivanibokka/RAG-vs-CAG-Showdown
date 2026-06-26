@@ -13,15 +13,22 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState('query')
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '')
+  const [llmConfig, setLlmConfig] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('llm_config') || 'null') } catch { return null }
+  })
 
-  if (!apiKey) {
-    return <ApiKeyGate onKeySet={setApiKey} />
+  if (!llmConfig?.key) {
+    return <ApiKeyGate onConfigSet={setLlmConfig} />
+  }
+
+  const handleClearConfig = () => {
+    localStorage.removeItem('llm_config')
+    setLlmConfig(null)
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white text-gray-900">
-      <Header onClearKey={() => { localStorage.removeItem('openai_api_key'); setApiKey('') }} />
+      <Header onClearKey={handleClearConfig} />
 
       {/* tab bar */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-gray-200 shadow-sm">
@@ -43,8 +50,8 @@ export default function App() {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <div style={{ display: tab === 'query'     ? 'block' : 'none' }}><QueryPanel apiKey={apiKey} /></div>
-        <div style={{ display: tab === 'benchmark' ? 'block' : 'none' }}><BenchmarkPanel apiKey={apiKey} /></div>
+        <div style={{ display: tab === 'query'     ? 'block' : 'none' }}><QueryPanel llmConfig={llmConfig} /></div>
+        <div style={{ display: tab === 'benchmark' ? 'block' : 'none' }}><BenchmarkPanel llmConfig={llmConfig} /></div>
         <div style={{ display: tab === 'health'    ? 'block' : 'none' }}><HealthStatus /></div>
       </main>
     </div>

@@ -1,113 +1,149 @@
 import { useState } from 'react'
+import { PROVIDERS, DEFAULT_PROVIDER_ID } from '../providers'
 
-const COSTS = {
-  battle: { tokens: 17000, usd: '~$0.003' },
-  tournament: { tokens: 185000, usd: '~$0.036' },
-}
+export default function ApiKeyGate({ onConfigSet }) {
+  const [providerId, setProviderId] = useState(DEFAULT_PROVIDER_ID)
+  const [modelId, setModelId]       = useState(PROVIDERS[0].models[0].id)
+  const [key, setKey]               = useState('')
+  const [error, setError]           = useState('')
 
-export default function ApiKeyGate({ onKeySet }) {
-  const [key, setKey] = useState('')
-  const [error, setError] = useState('')
+  const provider = PROVIDERS.find(p => p.id === providerId)
+  const model    = provider.models.find(m => m.id === modelId) ?? provider.models[0]
 
-  function handleSubmit(e) {
+  const handleProviderChange = (id) => {
+    const p = PROVIDERS.find(p => p.id === id)
+    setProviderId(id)
+    setModelId(p.models[0].id)
+    setError('')
+  }
+
+  const handleSubmit = (e) => {
     e.preventDefault()
     const trimmed = key.trim()
-    if (!trimmed) {
-      setError('Please enter an API key.')
-      return
-    }
-    localStorage.setItem('openai_api_key', trimmed)
-    onKeySet(trimmed)
+    if (!trimmed) { setError('Please enter an API key.'); return }
+    const config = { providerId, baseUrl: provider.baseUrl, model: model.id, key: trimmed }
+    localStorage.setItem('llm_config', JSON.stringify(config))
+    onConfigSet(config)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white flex items-center justify-center px-4">
-      <div className="w-full max-w-lg">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-white flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-lg space-y-4">
 
-        {/* Title */}
-        <div className="text-center mb-8">
+        {/* title */}
+        <div className="text-center mb-6">
           <div className="text-5xl mb-3">⚔️</div>
           <h1 className="text-3xl font-black text-gray-900 mb-1">CAG vs RAG Showdown</h1>
-          <p className="text-gray-500 text-sm">Enter your API key to begin — it goes straight from your browser to the LLM provider. We never store it.</p>
+          <p className="text-gray-500 text-sm">
+            Pick your provider, select a model, and enter your API key.
+            <br/>Your key goes straight from your browser to the provider — never stored on the server.
+          </p>
         </div>
 
-        {/* Key input */}
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl border-2 border-gray-200 p-6 mb-4 shadow-sm">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            API Key <span className="text-gray-400 font-normal">(OpenAI, Gemini, Anthropic, or compatible)</span>
-          </label>
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => { setKey(e.target.value); setError('') }}
-            placeholder="sk-... or your provider's key format"
-            className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 font-mono text-sm focus:outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 mb-3 transition-all"
-          />
-          {error && (
-            <p className="text-red-500 text-xs mb-3">{error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={!key.trim()}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity shadow-md shadow-blue-200"
-          >
-            Enter the Arena →
-          </button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* step 1 — provider */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 shadow-sm">
+            <p className="text-sm font-semibold text-gray-700 mb-3">1. Choose provider</p>
+            <div className="grid grid-cols-5 gap-2">
+              {PROVIDERS.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => handleProviderChange(p.id)}
+                  className={`py-2 px-1 rounded-xl text-xs font-bold border-2 transition-all ${
+                    providerId === p.id
+                      ? 'bg-violet-600 text-white border-violet-600 shadow-md shadow-violet-200'
+                      : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-violet-300 hover:text-violet-700'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">Get your key at {provider.keyHint}</p>
+          </div>
+
+          {/* step 2 — model */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 shadow-sm">
+            <p className="text-sm font-semibold text-gray-700 mb-3">2. Select model</p>
+            <div className="flex flex-col gap-2">
+              {provider.models.map(m => (
+                <label
+                  key={m.id}
+                  className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    modelId === m.id
+                      ? 'border-violet-400 bg-violet-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="radio"
+                      name="model"
+                      value={m.id}
+                      checked={modelId === m.id}
+                      onChange={() => setModelId(m.id)}
+                      className="accent-violet-600"
+                    />
+                    <span className="text-sm font-mono text-gray-800">{m.label}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                      m.tier === 'free'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-amber-100 text-amber-700'
+                    }`}>
+                      {m.tier}
+                    </span>
+                    {!m.cagSafe && (
+                      <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold">
+                        CAG ❌
+                      </span>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {!model.cagSafe && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 leading-relaxed">
+                ⚠️ <strong>CAG will fail with this model.</strong> {model.warning}
+              </div>
+            )}
+          </div>
+
+          {/* step 3 — key */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-5 shadow-sm">
+            <label className="block text-sm font-semibold text-gray-700 mb-2">
+              3. Enter API key
+            </label>
+            <input
+              type="password"
+              value={key}
+              onChange={e => { setKey(e.target.value); setError('') }}
+              placeholder={provider.keyPlaceholder}
+              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 font-mono text-sm focus:outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 mb-3 transition-all"
+            />
+            {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+            <button
+              type="submit"
+              disabled={!key.trim()}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity shadow-md shadow-blue-200"
+            >
+              Enter the Arena →
+            </button>
+          </div>
         </form>
 
-        {/* Token usage */}
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5 mb-4">
-          <p className="text-amber-700 font-bold text-sm mb-3">⚡ Token Usage Per Session (OpenAI gpt-4o-mini rates)</p>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-gray-700">
-              <span>⚔️ Single Challenge (CAG + RAG)</span>
-              <span className="font-mono text-amber-600">~{COSTS.battle.tokens.toLocaleString()} tokens &nbsp;{COSTS.battle.usd}</span>
-            </div>
-            <div className="flex justify-between text-gray-700">
-              <span>🏆 Full Tournament (10 questions + judge)</span>
-              <span className="font-mono text-amber-600">~{COSTS.tournament.tokens.toLocaleString()} tokens &nbsp;{COSTS.tournament.usd}</span>
-            </div>
-          </div>
-          <p className="text-amber-500 text-xs mt-3">Rates vary by provider. Free tiers with sufficient limits work too — see below.</p>
+        {/* cost hint */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-700">
+          <p className="font-bold mb-1">⚡ Approximate token usage per session</p>
+          <p>⚔️ Single Challenge (CAG + RAG): ~17,000 tokens</p>
+          <p>🏆 Full Tournament (10 questions + judge): ~185,000 tokens</p>
+          <p className="text-amber-500 mt-1">Rates vary by provider and model. Free tiers with sufficient limits work.</p>
         </div>
 
-        {/* Model requirements */}
-        <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 shadow-sm">
-          <p className="text-gray-800 font-bold text-sm mb-2">📋 The one requirement: 13,500+ tokens per request</p>
-          <p className="text-gray-500 text-xs mb-3 leading-relaxed">
-            CAG loads the <strong className="text-gray-800">entire knowledge base (~13,500 tokens)</strong> into a single
-            LLM call. Your provider must accept a request that large without hitting a rate or context limit.
-          </p>
-          <div className="space-y-1.5 text-xs">
-            <div className="flex items-start gap-2 text-green-600">
-              <span className="mt-0.5">✅</span>
-              <span><strong>OpenAI</strong> (any tier) — no per-request token cap</span>
-            </div>
-            <div className="flex items-start gap-2 text-green-600">
-              <span className="mt-0.5">✅</span>
-              <span><strong>Anthropic</strong> — 200K context window</span>
-            </div>
-            <div className="flex items-start gap-2 text-green-600">
-              <span className="mt-0.5">✅</span>
-              <span><strong>Google Gemini free tier</strong> — 1 million TPM, handles 13,500 easily</span>
-            </div>
-            <div className="flex items-start gap-2 text-amber-600">
-              <span className="mt-0.5">⚠️</span>
-              <span><strong>Groq free tier</strong> — hard 12,000 TPM cap. CAG needs 13,500, so it will fail. RAG alone still works.</span>
-            </div>
-            <div className="flex items-start gap-2 text-red-500">
-              <span className="mt-0.5">❌</span>
-              <span>Any provider with &lt;14K tokens per-request limit — CAG will be rejected</span>
-            </div>
-          </div>
-          <p className="text-gray-400 text-xs mt-3 border-t border-gray-100 pt-3">
-            Not sure if your provider works? Try it — if CAG fails with a token limit error, that's why.
-          </p>
-        </div>
-
-        <p className="text-center text-gray-400 text-xs mt-4">
-          OpenAI keys at platform.openai.com · Gemini keys at aistudio.google.com
-        </p>
       </div>
     </div>
   )

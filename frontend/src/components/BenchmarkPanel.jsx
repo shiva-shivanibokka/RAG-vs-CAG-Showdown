@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { runBenchmark } from '../api'
 import ResultsView from './ResultsView'
 
-export default function BenchmarkPanel({ apiKey }) {
+export default function BenchmarkPanel({ llmConfig }) {
   const [useJudge, setUseJudge] = useState(true)
   const [results, setResults] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -13,7 +13,7 @@ export default function BenchmarkPanel({ apiKey }) {
     setError(null)
     setResults(null)
     try {
-      const data = await runBenchmark(useJudge, apiKey)
+      const data = await runBenchmark(useJudge, llmConfig)
       setResults(data)
     } catch (err) {
       setError(err.message)
@@ -95,10 +95,9 @@ export default function BenchmarkPanel({ apiKey }) {
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 space-y-3">
         <p className="text-sm font-bold text-gray-700">🧑‍⚖️ How the LLM Judge works</p>
         <p className="text-xs text-gray-500 leading-relaxed">
-          The judge is the same LLM (Llama 3.3 70B on Cloudflare Workers AI) used to generate answers —
-          but called a third time per question, acting as an independent evaluator.
-          It receives the question, the answer, and a list of expected concepts it should look for,
-          then returns scores across four dimensions:
+          The judge is the same LLM you selected — called a third time per question, acting as an
+          independent evaluator. It receives the question, the answer, and a list of expected concepts
+          it should look for, then returns scores across four dimensions:
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[

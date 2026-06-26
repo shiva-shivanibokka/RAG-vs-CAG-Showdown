@@ -1,8 +1,9 @@
 """
 RAG Engine — Retrieval Augmented Generation (Cloudflare Workers AI backend)
 ===========================================================================
-1. Index: chunk -> embed (fastembed / ONNX, no PyTorch) -> FAISS
-2. Query: embed question -> top-k retrieval -> Cloudflare AI generation
+1. Index: chunk -> embed via CF Workers AI API -> FAISS (in-memory)
+2. Query: embed question via CF API -> top-k retrieval -> CF AI generation
+No local embedding model or onnxruntime — zero extra memory.
 """
 
 import logging
@@ -12,7 +13,6 @@ from pathlib import Path
 
 import faiss
 import numpy as np
-from fastembed import TextEmbedding
 from openai import AsyncOpenAI, OpenAI
 
 from src.config import (
@@ -68,22 +68,8 @@ class RAGEngine:
     """
     Retrieval Augmented Generation backed by FAISS + Cloudflare Workers AI.
 
-    Parameters
-    ----------
-    knowledge_base_path : str | Path
-    model : str
-        Cloudflare Workers AI model tag.
-    embedding_model_name : str
-        sentence-transformers model for embedding (runs locally).
-    top_k : int
-        Number of chunks to retrieve per query.
-    max_tokens : int
-        Maximum tokens to generate.
-    max_retries : int
-    chunking_strategy : str
-        "topic" (semantic, preferred) or "fixed" (fallback).
-    _client : optional
-        Injected OpenAI-compatible client for tests.
+    Embeddings are computed via the CF Workers AI embeddings API (no local
+    model / onnxruntime). FAISS index lives in memory for fast retrieval.
     """
 
     def __init__(
@@ -98,6 +84,7 @@ class RAGEngine:
         _client=None,
     ):
         self.model = model
+        self.embedding_model_name = embedding_model_name
         self.top_k = top_k
         self.max_tokens = max_tokens
         self._max_retries = max_retries
@@ -110,9 +97,6 @@ class RAGEngine:
         if not kb_path.exists():
             raise FileNotFoundError(f"Knowledge base not found: {kb_path}")
 
-        logger.info("RAG | loading embedding model: %s", embedding_model_name)
-        self.embedder = TextEmbedding(embedding_model_name)
-
         raw_text = kb_path.read_text(encoding="utf-8")
         self.chunks = self._chunk(raw_text, chunking_strategy)
         logger.info(
@@ -121,11 +105,28 @@ class RAGEngine:
 
         index_time = self._build_index()
         logger.info(
-            "RAG | FAISS index built in %.3fs | model=%s | top_k=%d",
+            "RAG | FAISS index built in %.3fs | embedding_model=%s | top_k=%d",
             index_time,
-            model,
+            embedding_model_name,
             top_k,
         )
+
+    # ------------------------------------------------------------------
+    # Embedding via CF Workers AI
+    # ------------------------------------------------------------------
+
+    def _embed(self, texts: list[str]) -> np.ndarray:
+        """Call CF Workers AI embeddings API. Batches up to 10 texts at a time."""
+        all_embeddings: list[list[float]] = []
+        batch_size = 10
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            resp = self._client.embeddings.create(
+                model=self.embedding_model_name,
+                input=batch,
+            )
+            all_embeddings.extend(item.embedding for item in resp.data)
+        return np.array(all_embeddings, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Indexing
@@ -146,7 +147,8 @@ class RAGEngine:
     def _build_index(self) -> float:
         start = time.perf_counter()
         texts = [c["text"] for c in self.chunks]
-        embeddings = np.array(list(self.embedder.embed(texts)))
+        logger.info("RAG | embedding %d chunks via CF Workers AI...", len(texts))
+        embeddings = self._embed(texts)
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         self._embeddings = embeddings / np.maximum(norms, 1e-10)
         dim = self._embeddings.shape[1]
@@ -160,7 +162,7 @@ class RAGEngine:
 
     def _retrieve(self, question: str) -> tuple[list[dict], float]:
         start = time.perf_counter()
-        q_emb = np.array(list(self.embedder.embed([question])))
+        q_emb = self._embed([question])
         q_norm = q_emb / np.maximum(
             np.linalg.norm(q_emb, axis=1, keepdims=True), 1e-10
         )

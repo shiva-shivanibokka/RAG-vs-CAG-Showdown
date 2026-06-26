@@ -6,18 +6,9 @@ import pytest
 from src.rag.engine import RAGEngine
 
 
-def _mock_embed(n_chunks=3):
-    """Return a fastembed-style embed() side_effect: callable(texts) -> generator of 1D arrays."""
-    def embed(texts):
-        return (np.random.rand(384).astype("float32") for _ in texts)
-    return embed
-
-
 def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
-    with patch("src.rag.engine.TextEmbedding") as mock_te:
-        mock_te.return_value.embed.side_effect = _mock_embed()
-        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
-        result = engine.query("What is KV cache?")
+    engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+    result = engine.query("What is KV cache?")
 
     assert set(result.keys()) == {
         "answer",
@@ -34,10 +25,8 @@ def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
 
 
 def test_query_method_is_rag(tmp_knowledge_base, mock_cf_client):
-    with patch("src.rag.engine.TextEmbedding") as mock_te:
-        mock_te.return_value.embed.side_effect = _mock_embed()
-        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
-        result = engine.query("test")
+    engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+    result = engine.query("test")
 
     assert result["method"] == "RAG"
     assert isinstance(result["retrieved_chunks"], list)
@@ -51,14 +40,12 @@ def test_missing_knowledge_base_raises(tmp_path):
 def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_cf_client):
     kb = tmp_path / "plain.txt"
     kb.write_text("No topic markers here. Just plain text with many words. " * 50)
-    with patch("src.rag.engine.TextEmbedding") as mock_te:
-        mock_te.return_value.embed.side_effect = _mock_embed()
-        engine = RAGEngine(kb, _client=mock_cf_client)
+    engine = RAGEngine(kb, _client=mock_cf_client)
     assert len(engine.chunks) > 0
 
 
 @pytest.mark.asyncio
-async def test_query_async_returns_correct_keys(tmp_knowledge_base):
+async def test_query_async_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
     choice = MagicMock()
     choice.message.content = "async RAG answer"
     async_response = MagicMock()
@@ -69,12 +56,8 @@ async def test_query_async_returns_correct_keys(tmp_knowledge_base):
     async_client = MagicMock()
     async_client.chat.completions.create = AsyncMock(return_value=async_response)
 
-    with (
-        patch("src.rag.engine.TextEmbedding") as mock_te,
-        patch("src.rag.engine.AsyncOpenAI", return_value=async_client),
-    ):
-        mock_te.return_value.embed.side_effect = _mock_embed()
-        engine = RAGEngine(tmp_knowledge_base)
+    with patch("src.rag.engine.AsyncOpenAI", return_value=async_client):
+        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
         result = await engine.query_async("What is KV cache?")
 
     assert result["answer"] == "async RAG answer"

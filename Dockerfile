@@ -9,10 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download the ONNX embedding model so cold starts don't re-fetch it
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
-
-# Copy source and install the package itself (deps already present above)
+# Copy source and register the package (deps already installed above)
 COPY . .
 RUN pip install --no-cache-dir -e . --no-deps
 

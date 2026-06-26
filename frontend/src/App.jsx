@@ -14,10 +14,10 @@ export default function App() {
   const [tab, setTab] = useState('query')
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-gray-50 text-gray-900">
       <Header />
 
-      <nav className="border-b border-slate-800 bg-slate-900">
+      <nav className="border-b border-gray-200 bg-white">
         <div className="max-w-6xl mx-auto px-4 flex gap-1">
           {TABS.map((t) => (
             <button
@@ -25,8 +25,8 @@ export default function App() {
               onClick={() => setTab(t.id)}
               className={`px-5 py-3 text-sm font-medium transition-colors ${
                 tab === t.id
-                  ? 'text-white border-b-2 border-blue-500'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'text-blue-600 border-b-2 border-blue-500'
+                  : 'text-gray-500 hover:text-gray-800'
               }`}
             >
               {t.label}

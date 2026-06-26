@@ -14,10 +14,10 @@ const CAG_COLOR = '#3b82f6'
 const RAG_COLOR = '#10b981'
 
 const tooltipStyle = {
-  backgroundColor: '#1e293b',
-  border: '1px solid #334155',
+  backgroundColor: '#fff',
+  border: '1px solid #e5e7eb',
   borderRadius: '6px',
-  color: '#f1f5f9',
+  color: '#111827',
   fontSize: '12px',
 }
 
@@ -52,7 +52,7 @@ export default function ResultsView({ data }) {
       <div className="grid grid-cols-3 gap-3">
         <WinCard label="CAG wins" value={summary.cag.wins} color="blue" />
         <WinCard label="RAG wins" value={summary.rag.wins} color="emerald" />
-        <WinCard label="Ties" value={summary.ties} color="slate" />
+        <WinCard label="Ties" value={summary.ties} color="gray" />
       </div>
 
       {/* Charts */}
@@ -60,9 +60,9 @@ export default function ResultsView({ data }) {
         <ChartCard title="Judge Score by Question (0–5)">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={scoreData} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="id" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis domain={[0, 5]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="id" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis domain={[0, 5]} tick={{ fill: '#6b7280', fontSize: 11 }} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="CAG" fill={CAG_COLOR} radius={[3, 3, 0, 0]} />
@@ -74,9 +74,9 @@ export default function ResultsView({ data }) {
         <ChartCard title="Latency by Question (seconds)">
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={latencyData} margin={{ top: 4, right: 8, bottom: 4, left: -10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="id" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="id" tick={{ fill: '#6b7280', fontSize: 11 }} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} />
               <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="CAG" fill={CAG_COLOR} radius={[3, 3, 0, 0]} />
@@ -87,15 +87,15 @@ export default function ResultsView({ data }) {
       </div>
 
       {/* Results table */}
-      <div className="rounded-lg bg-slate-800 border border-slate-700 overflow-hidden">
+      <div className="rounded-lg bg-white border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700 text-slate-400 text-xs">
+            <tr className="border-b border-gray-200 text-gray-500 text-xs bg-gray-50">
               <th className="text-left px-4 py-3">ID</th>
               <th className="text-left px-4 py-3">Category</th>
               <th className="text-left px-4 py-3">Question</th>
-              <th className="text-right px-4 py-3 text-blue-400">CAG</th>
-              <th className="text-right px-4 py-3 text-emerald-400">RAG</th>
+              <th className="text-right px-4 py-3 text-blue-600">CAG</th>
+              <th className="text-right px-4 py-3 text-emerald-600">RAG</th>
               <th className="text-right px-4 py-3">Winner</th>
             </tr>
           </thead>
@@ -108,17 +108,17 @@ export default function ResultsView({ data }) {
                 <tr
                   key={r.id}
                   onClick={() => setSelected(r.id)}
-                  className={`border-b border-slate-700 cursor-pointer transition-colors ${
-                    selected === r.id ? 'bg-slate-700' : 'hover:bg-slate-750'
+                  className={`border-b border-gray-100 cursor-pointer transition-colors ${
+                    selected === r.id ? 'bg-blue-50' : 'hover:bg-gray-50'
                   }`}
                 >
-                  <td className="px-4 py-3 font-mono text-xs text-slate-300">{r.id}</td>
-                  <td className="px-4 py-3 text-slate-400 text-xs">{r.category}</td>
-                  <td className="px-4 py-3 text-slate-200 max-w-xs truncate">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.id}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{r.category}</td>
+                  <td className="px-4 py-3 text-gray-800 max-w-xs truncate">
                     {r.question.length > 60 ? r.question.slice(0, 60) + '…' : r.question}
                   </td>
-                  <td className="px-4 py-3 text-right text-blue-400">{cs || '—'}</td>
-                  <td className="px-4 py-3 text-right text-emerald-400">{rs || '—'}</td>
+                  <td className="px-4 py-3 text-right text-blue-600">{cs || '—'}</td>
+                  <td className="px-4 py-3 text-right text-emerald-600">{rs || '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <WinnerBadge winner={winner} />
                   </td>
@@ -137,14 +137,14 @@ export default function ResultsView({ data }) {
 
 function QuestionDetail({ q }) {
   return (
-    <div className="rounded-lg bg-slate-800 border border-slate-700 p-5 space-y-4">
+    <div className="rounded-lg bg-white border border-gray-200 p-5 space-y-4">
       <div>
-        <p className="text-xs text-slate-400 mb-1">
+        <p className="text-xs text-gray-400 mb-1">
           {q.id} · {q.category}
         </p>
-        <p className="text-white font-medium">{q.question}</p>
+        <p className="text-gray-900 font-medium">{q.question}</p>
         {q.expected_concepts?.length > 0 && (
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Expected: {q.expected_concepts.join(', ')}
           </p>
         )}
@@ -158,28 +158,28 @@ function QuestionDetail({ q }) {
 }
 
 function DetailCard({ title, color, result }) {
-  const titleColor = color === 'blue' ? 'text-blue-400' : 'text-emerald-400'
-  const borderColor = color === 'blue' ? 'border-blue-800' : 'border-emerald-800'
+  const titleColor = color === 'blue' ? 'text-blue-600' : 'text-emerald-600'
+  const borderColor = color === 'blue' ? 'border-blue-200' : 'border-emerald-200'
   const scores = result.judge_scores ?? {}
 
   return (
-    <div className={`rounded-lg bg-slate-900 border ${borderColor} p-4 space-y-3`}>
+    <div className={`rounded-lg bg-gray-50 border ${borderColor} p-4 space-y-3`}>
       <div className="flex items-center justify-between">
         <span className={`text-sm font-bold ${titleColor}`}>{title}</span>
-        <span className="text-xs text-slate-400">{result.latency_seconds}s</span>
+        <span className="text-xs text-gray-400">{result.latency_seconds}s</span>
       </div>
-      <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{result.answer}</p>
+      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{result.answer}</p>
       {scores.total !== undefined && (
-        <div className="pt-2 border-t border-slate-700 grid grid-cols-2 gap-1 text-xs text-slate-400">
+        <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-1 text-xs text-gray-500">
           <span>Correctness: {scores.correctness}</span>
           <span>Completeness: {scores.completeness}</span>
           <span>Coherence: {scores.coherence}</span>
           <span>Groundedness: {scores.groundedness}</span>
-          <span className="col-span-2 font-semibold text-white">Total: {scores.total} / 5</span>
+          <span className="col-span-2 font-semibold text-gray-900">Total: {scores.total} / 5</span>
         </div>
       )}
       {result.retrieved_chunks?.length > 0 && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-gray-400">
           Retrieved: {result.retrieved_chunks.map((c) => c.title).join(', ')}
         </p>
       )}
@@ -188,10 +188,10 @@ function DetailCard({ title, color, result }) {
 }
 
 function KpiCard({ label, value, color }) {
-  const textColor = color === 'blue' ? 'text-blue-400' : 'text-emerald-400'
+  const textColor = color === 'blue' ? 'text-blue-600' : 'text-emerald-600'
   return (
-    <div className="rounded-lg bg-slate-800 border border-slate-700 p-4">
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className="rounded-lg bg-white border border-gray-200 p-4">
+      <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className={`text-xl font-bold ${textColor}`}>{value}</p>
     </div>
   )
@@ -199,20 +199,29 @@ function KpiCard({ label, value, color }) {
 
 function WinCard({ label, value, color }) {
   const textColor =
-    color === 'blue' ? 'text-blue-400' : color === 'emerald' ? 'text-emerald-400' : 'text-slate-300'
+    color === 'blue' ? 'text-blue-600' : color === 'emerald' ? 'text-emerald-600' : 'text-gray-600'
   return (
-    <div className="rounded-lg bg-slate-800 border border-slate-700 p-4 text-center">
+    <div className="rounded-lg bg-white border border-gray-200 p-4 text-center">
       <p className={`text-2xl font-bold ${textColor}`}>{value}</p>
-      <p className="text-xs text-slate-400 mt-1">{label}</p>
+      <p className="text-xs text-gray-500 mt-1">{label}</p>
+    </div>
+  )
+}
+
+function ChartCard({ title, children }) {
+  return (
+    <div className="rounded-lg bg-white border border-gray-200 p-4">
+      <p className="text-sm font-medium text-gray-700 mb-3">{title}</p>
+      {children}
     </div>
   )
 }
 
 function WinnerBadge({ winner }) {
   const styles = {
-    CAG: 'bg-blue-900 text-blue-300',
-    RAG: 'bg-emerald-900 text-emerald-300',
-    TIE: 'bg-slate-700 text-slate-300',
+    CAG: 'bg-blue-100 text-blue-700',
+    RAG: 'bg-emerald-100 text-emerald-700',
+    TIE: 'bg-gray-100 text-gray-600',
   }
   return (
     <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[winner]}`}>{winner}</span>

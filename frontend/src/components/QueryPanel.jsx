@@ -26,8 +26,8 @@ export default function QueryPanel() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold mb-1">Ask a Question</h2>
-        <p className="text-sm text-slate-400">
+        <h2 className="text-lg font-semibold text-gray-900 mb-1">Ask a Question</h2>
+        <p className="text-sm text-gray-500">
           Sends your question to both CAG and RAG simultaneously and shows the answers side by side.
         </p>
       </div>
@@ -38,20 +38,20 @@ export default function QueryPanel() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="e.g. What is the KV cache and how does CAG exploit it?"
-          className="flex-1 rounded-lg bg-slate-800 border border-slate-700 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+          className="flex-1 rounded-lg bg-white border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || !question.trim()}
-          className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-sm font-medium transition-colors"
+          className="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-100 disabled:text-gray-400 text-white text-sm font-medium transition-colors"
         >
           {loading ? 'Querying…' : 'Ask'}
         </button>
       </form>
 
       {error && (
-        <div className="rounded-lg bg-red-950 border border-red-800 p-4 text-red-300 text-sm">
+        <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-600 text-sm">
           {error}
         </div>
       )}
@@ -67,17 +67,17 @@ export default function QueryPanel() {
 }
 
 function AnswerCard({ title, color, data }) {
-  const borderColor = color === 'blue' ? 'border-blue-700' : 'border-emerald-700'
-  const titleColor = color === 'blue' ? 'text-blue-400' : 'text-emerald-400'
+  const borderColor = color === 'blue' ? 'border-blue-300' : 'border-emerald-300'
+  const titleColor = color === 'blue' ? 'text-blue-600' : 'text-emerald-600'
 
   return (
-    <div className={`rounded-lg bg-slate-800 border ${borderColor} p-5 space-y-3`}>
+    <div className={`rounded-lg bg-white border ${borderColor} p-5 space-y-3`}>
       <div className="flex items-center justify-between">
         <span className={`text-sm font-bold ${titleColor}`}>{title}</span>
-        <span className="text-xs text-slate-400">{data.latency_seconds}s</span>
+        <span className="text-xs text-gray-400">{data.latency_seconds}s</span>
       </div>
-      <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">{data.answer}</p>
-      <div className="flex gap-4 text-xs text-slate-500 pt-1 border-t border-slate-700">
+      <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{data.answer}</p>
+      <div className="flex gap-4 text-xs text-gray-400 pt-1 border-t border-gray-100">
         <span>in: {data.input_tokens.toLocaleString()} tok</span>
         <span>out: {data.output_tokens.toLocaleString()} tok</span>
         {data.retrieved_chunks?.length > 0 && (

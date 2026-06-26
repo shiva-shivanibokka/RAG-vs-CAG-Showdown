@@ -185,7 +185,7 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+                async_client = AsyncOpenAI(api_key=self._api_key or OPENAI_API_KEY or "not-configured")
                 response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,

@@ -37,9 +37,9 @@ export default function App() {
       </div>
 
       <main className="max-w-5xl mx-auto px-4 py-8">
-        {tab === 'query'     && <QueryPanel />}
-        {tab === 'benchmark' && <BenchmarkPanel />}
-        {tab === 'health'    && <HealthStatus />}
+        <div className={tab === 'query'     ? '' : 'hidden'}><QueryPanel /></div>
+        <div className={tab === 'benchmark' ? '' : 'hidden'}><BenchmarkPanel /></div>
+        <div className={tab === 'health'    ? '' : 'hidden'}><HealthStatus /></div>
       </main>
     </div>
   )

@@ -6,7 +6,7 @@ services:
     branch: main
     healthCheckPath: /health
     envVars:
-      - key: TOGETHER_API_KEY
+      - key: OPENAI_API_KEY
         sync: false          # set this manually in Render dashboard
       - key: CF_ACCOUNT_ID
         sync: false          # set this manually in Render dashboard — used for embeddings only

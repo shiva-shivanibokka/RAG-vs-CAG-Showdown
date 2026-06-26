@@ -5,10 +5,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Together AI — text generation ($5 free credit on signup, ~2000 CAG requests)
-TOGETHER_API_KEY: str = os.getenv("TOGETHER_API_KEY", "")
-TOGETHER_MODEL: str = os.getenv("TOGETHER_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
-TOGETHER_BASE_URL: str = "https://api.together.xyz/v1"
+# OpenAI — text generation (gpt-4o-mini: ~$0.000002/request, $5 ≈ 2500 CAG requests)
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
 # Cloudflare Workers AI — embeddings only
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")

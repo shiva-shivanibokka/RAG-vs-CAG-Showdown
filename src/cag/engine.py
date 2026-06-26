@@ -1,6 +1,6 @@
 """
-CAG Engine — Context Augmented Generation (Gemini backend)
-==========================================================
+CAG Engine — Context Augmented Generation
+==========================================
 Loads the entire knowledge base into the LLM context window.
 No retrieval step. No vector database. No chunking.
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import TOGETHER_API_KEY, TOGETHER_BASE_URL, TOGETHER_MODEL, MAX_RETRIES, MAX_TOKENS
+from src.config import OPENAI_API_KEY, OPENAI_MODEL, MAX_RETRIES, MAX_TOKENS
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class CAGEngine:
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = TOGETHER_MODEL,
+        model: str = OPENAI_MODEL,
         max_tokens: int = MAX_TOKENS,
         max_retries: int = MAX_RETRIES,
         _client=None,
@@ -28,10 +28,7 @@ class CAGEngine:
         self.model = model
         self.max_tokens = max_tokens
         self._max_retries = max_retries
-        self._client: OpenAI = _client or OpenAI(
-            api_key=TOGETHER_API_KEY,
-            base_url=TOGETHER_BASE_URL,
-        )
+        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY)
 
         kb_path = Path(knowledge_base_path)
         if not kb_path.exists():
@@ -102,7 +99,7 @@ class CAGEngine:
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=TOGETHER_API_KEY, base_url=TOGETHER_BASE_URL)
+        async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

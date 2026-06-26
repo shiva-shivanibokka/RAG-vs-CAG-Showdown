@@ -16,7 +16,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import TOGETHER_API_KEY, TOGETHER_BASE_URL, TOGETHER_MODEL, MAX_RETRIES
+from src.config import OPENAI_API_KEY, OPENAI_MODEL, MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 
@@ -118,16 +118,13 @@ class LLMJudge:
 
     def __init__(
         self,
-        judge_model: str = TOGETHER_MODEL,
+        judge_model: str = OPENAI_MODEL,
         max_retries: int = MAX_RETRIES,
         _client=None,
     ):
         self.judge_model = judge_model
         self._max_retries = max_retries
-        self._client: OpenAI = _client or OpenAI(
-            api_key=TOGETHER_API_KEY,
-            base_url=TOGETHER_BASE_URL,
-        )
+        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY)
 
     def _parse_judge_response(self, raw: str) -> dict:
         """Strip markdown fences, parse JSON, validate required fields, add total."""
@@ -186,7 +183,7 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                async_client = AsyncOpenAI(api_key=TOGETHER_API_KEY, base_url=TOGETHER_BASE_URL)
+                async_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
                 response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,

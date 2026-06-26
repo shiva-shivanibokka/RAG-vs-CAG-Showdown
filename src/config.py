@@ -7,7 +7,7 @@ load_dotenv()
 
 # OpenRouter — text generation (free tier, no credit card, global availability)
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
 OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
 # Cloudflare Workers AI — embeddings only

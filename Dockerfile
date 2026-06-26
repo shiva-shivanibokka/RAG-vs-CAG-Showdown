@@ -2,17 +2,19 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# curl for healthcheck probes; no gcc/g++ needed — fastembed and faiss-cpu ship pre-built wheels
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
+# Install dependencies first (cached layer — only re-runs if requirements.txt changes)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Pre-download ONNX embedding model (~25 MB) so cold starts don't re-download it
+# Pre-download the ONNX embedding model so cold starts don't re-fetch it
 RUN python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 
+# Copy source and install the package itself (deps already present above)
 COPY . .
+RUN pip install --no-cache-dir -e . --no-deps
 
 EXPOSE 8000
 

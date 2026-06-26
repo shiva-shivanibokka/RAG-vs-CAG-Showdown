@@ -18,9 +18,9 @@ from src.config import (
     CF_ACCOUNT_ID,
     CF_API_TOKEN,
     EMBEDDING_MODEL,
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE_URL,
-    OPENROUTER_MODEL,
+    TOGETHER_API_KEY,
+    TOGETHER_BASE_URL,
+    TOGETHER_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
     RAG_TOP_K,
@@ -73,7 +73,7 @@ class RAGEngine:
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = OPENROUTER_MODEL,
+        model: str = TOGETHER_MODEL,
         embedding_model_name: str = EMBEDDING_MODEL,
         top_k: int = RAG_TOP_K,
         max_tokens: int = MAX_TOKENS,
@@ -89,8 +89,8 @@ class RAGEngine:
 
         # In tests _client handles everything; in production use separate clients.
         self._client: OpenAI = _client or OpenAI(
-            api_key=OPENROUTER_API_KEY,
-            base_url=OPENROUTER_BASE_URL,
+            api_key=TOGETHER_API_KEY,
+            base_url=TOGETHER_BASE_URL,
         )
         self._embed_client: OpenAI = _client or OpenAI(
             api_key=CF_API_TOKEN,
@@ -260,7 +260,7 @@ class RAGEngine:
         retrieved_chunks, retrieval_latency = self._retrieve(question)
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL)
+        async_client = AsyncOpenAI(api_key=TOGETHER_API_KEY, base_url=TOGETHER_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,

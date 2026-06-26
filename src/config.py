@@ -5,10 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# OpenRouter — text generation (free tier, no credit card, global availability)
-OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "mistralai/mistral-7b-instruct:free")
-OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+# Together AI — text generation ($5 free credit on signup, ~2000 CAG requests)
+TOGETHER_API_KEY: str = os.getenv("TOGETHER_API_KEY", "")
+TOGETHER_MODEL: str = os.getenv("TOGETHER_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo")
+TOGETHER_BASE_URL: str = "https://api.together.xyz/v1"
 
 # Cloudflare Workers AI — embeddings only
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")

@@ -5,10 +5,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Gemini — text generation (free tier: 1,000,000 TPM, 1,500 req/day)
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+# Cerebras — text generation (free tier: 60K TPM for 8B, 30K TPM for 70B)
+CEREBRAS_API_KEY: str = os.getenv("CEREBRAS_API_KEY", "")
+CEREBRAS_MODEL: str = os.getenv("CEREBRAS_MODEL", "llama-3.3-70b")
+CEREBRAS_BASE_URL: str = "https://api.cerebras.ai/v1"
 
 # Cloudflare Workers AI — embeddings only
 CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")

@@ -7,6 +7,7 @@
 
 [![CI](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions/workflows/ci.yml/badge.svg)](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
+[![Live Demo](https://img.shields.io/badge/demo-live%20on%20Vercel-black?logo=vercel)](https://rag-vs-cag-showdown.vercel.app/)
 
 **Live demo** → [rag-vs-cag-showdown.vercel.app](https://rag-vs-cag-showdown.vercel.app/)
 

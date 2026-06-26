@@ -63,7 +63,7 @@ export default function QueryPanel({ llmConfig }) {
     setActiveTopic(topic.label)
     setResult(null)
     setError(null)
-    const q = `Explain ${topic.label} and how it relates to CAG and RAG systems.`
+    const q = `Explain ${topic.label} and its key concepts.`
     setQuestion(q)
     submit(q)
   }

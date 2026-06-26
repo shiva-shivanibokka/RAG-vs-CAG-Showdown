@@ -176,9 +176,10 @@ class RAGEngine:
             for i, c in enumerate(retrieved_chunks, 1)
         )
         system = (
-            "You are an expert AI/ML assistant. Answer using ONLY the context chunks below. "
-            "If the answer is not in the context, say 'The retrieved context does not contain "
-            "enough information to answer this question.'\n\nBe precise and reference the chunks."
+            "You are an expert AI/ML assistant. Answer the question using the context chunks "
+            "provided below. Synthesize information across chunks as needed — the answer may "
+            "be distributed across multiple chunks. Be precise and reference specific concepts "
+            "from the chunks in your answer."
         )
         return [
             {"role": "system", "content": system},

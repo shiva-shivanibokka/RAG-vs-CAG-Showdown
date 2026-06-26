@@ -1,13 +1,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import numpy as np
 import pytest
 
 from src.rag.engine import RAGEngine
 
 
-def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
-    engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_returns_correct_keys(tmp_knowledge_base, mock_llm_client):
+    engine = RAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("What is KV cache?")
 
     assert set(result.keys()) == {
@@ -24,8 +23,8 @@ def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
     }
 
 
-def test_query_method_is_rag(tmp_knowledge_base, mock_cf_client):
-    engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_method_is_rag(tmp_knowledge_base, mock_llm_client):
+    engine = RAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("test")
 
     assert result["method"] == "RAG"
@@ -37,15 +36,15 @@ def test_missing_knowledge_base_raises(tmp_path):
         RAGEngine(tmp_path / "nonexistent.txt")
 
 
-def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_cf_client):
+def test_falls_back_to_fixed_chunking_when_no_topics(tmp_path, mock_llm_client):
     kb = tmp_path / "plain.txt"
     kb.write_text("No topic markers here. Just plain text with many words. " * 50)
-    engine = RAGEngine(kb, _client=mock_cf_client)
+    engine = RAGEngine(kb, _client=mock_llm_client)
     assert len(engine.chunks) > 0
 
 
 @pytest.mark.asyncio
-async def test_query_async_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
+async def test_query_async_returns_correct_keys(tmp_knowledge_base, mock_llm_client):
     choice = MagicMock()
     choice.message.content = "async RAG answer"
     async_response = MagicMock()
@@ -57,7 +56,7 @@ async def test_query_async_returns_correct_keys(tmp_knowledge_base, mock_cf_clie
     async_client.chat.completions.create = AsyncMock(return_value=async_response)
 
     with patch("src.rag.engine.AsyncOpenAI", return_value=async_client):
-        engine = RAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+        engine = RAGEngine(tmp_knowledge_base, _client=mock_llm_client)
         result = await engine.query_async("What is KV cache?")
 
     assert result["answer"] == "async RAG answer"

@@ -2,7 +2,7 @@
 Benchmark Evaluator
 ===================
 Runs questions through CAG and RAG, measures latency and token counts,
-scores answers with an LLM-as-judge (Cloudflare Workers AI), saves JSON + CSV.
+scores answers with an LLM-as-judge, saves JSON + CSV.
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import OPENAI_API_KEY, OPENAI_MODEL, MAX_RETRIES
+from src.config import MAX_RETRIES, OPENAI_API_KEY, OPENAI_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -183,9 +183,9 @@ class LLMJudge:
             {"role": "user", "content": user},
         ]
         last_exc: Exception | None = None
+        async_client = AsyncOpenAI(api_key=self._api_key or OPENAI_API_KEY or "not-configured")
         for attempt in range(self._max_retries):
             try:
-                async_client = AsyncOpenAI(api_key=self._api_key or OPENAI_API_KEY or "not-configured")
                 response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,

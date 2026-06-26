@@ -422,3 +422,7 @@ CAG-vs-RAG-Showdown/
 ---
 
 ## Roadmap
+
+- **Upload your own knowledge base** — let visitors paste or upload their own documents and run CAG vs RAG on their own content. This turns the app from a fixed demo into a general-purpose evaluation tool, and makes the context-window constraint tangible for any domain.
+- **Streaming responses** — stream tokens to the UI as they arrive instead of waiting for the full response. CAG's latency disadvantage (~30% slower in the sample tournament) is largely a perception problem at full-document scale; streaming would make it feel much faster.
+- **Advanced RAG techniques** — add re-ranking (Cohere Rerank or a cross-encoder), HyDE (hypothetical document embeddings), or multi-query retrieval to close the accuracy gap. The current RAG pipeline is intentionally simple to make the comparison fair to CAG; a "RAG Pro" mode would show how far retrieval quality can be pushed.

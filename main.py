@@ -12,9 +12,8 @@ Usage:
     python main.py benchmark --top-k 5    Set RAG top-k chunks (default: 3)
 
 Environment variables (see .env):
-    CF_ACCOUNT_ID   Cloudflare account ID
-    CF_API_TOKEN    Cloudflare Workers AI API token
-    CF_MODEL        Model tag (default: @cf/meta/llama-3.1-8b-instruct)
+    OPENAI_API_KEY  API key for the LLM provider (required)
+    OPENAI_MODEL    Model to use (default: gpt-4o-mini)
     RAG_TOP_K       Top-k chunks for RAG (default: 3)
     LOG_LEVEL       Logging verbosity (default: INFO)
 """
@@ -29,7 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.benchmark.evaluator import Benchmarker  # noqa: E402
 from src.cag.engine import CAGEngine  # noqa: E402
-from src.config import CF_ACCOUNT_ID, CF_API_TOKEN, CF_MODEL, RAG_TOP_K, setup_logging  # noqa: E402
+from src.config import OPENAI_API_KEY, OPENAI_MODEL, RAG_TOP_K, setup_logging  # noqa: E402
 from src.rag.engine import RAGEngine  # noqa: E402
 
 KNOWLEDGE_BASE = PROJECT_ROOT / "knowledge_base" / "aiml_corpus.txt"
@@ -41,14 +40,11 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 # ---------------------------------------------------------------------------
 
 
-def check_cloudflare() -> None:
-    if not CF_ACCOUNT_ID or not CF_API_TOKEN:
-        print("[ERROR] CF_ACCOUNT_ID and CF_API_TOKEN must be set in your .env file.")
-        print("  1. Sign up for free at https://cloudflare.com")
-        print("  2. Copy your Account ID from the dashboard right sidebar")
-        print("  3. Create an API token: My Profile → API Tokens → Create Token")
-        print("     Use the 'Workers AI' template or grant 'Workers AI:Read' permission")
-        print("  4. Add both to your .env file")
+def check_api_key() -> None:
+    if not OPENAI_API_KEY:
+        print("[ERROR] OPENAI_API_KEY must be set in your .env file.")
+        print("  1. Get a key from platform.openai.com (or any OpenAI-compatible provider)")
+        print("  2. Add OPENAI_API_KEY=sk-... to your .env file")
         sys.exit(1)
 
 
@@ -87,9 +83,9 @@ def format_answer_block(method: str, result: dict) -> str:
 
 def cmd_benchmark(args) -> None:
     print_banner()
-    check_cloudflare()
+    check_api_key()
 
-    model = args.model or CF_MODEL
+    model = args.model or OPENAI_MODEL
     top_k = args.top_k or RAG_TOP_K
     use_judge = not args.no_judge
 
@@ -108,9 +104,9 @@ def cmd_benchmark(args) -> None:
 
 def cmd_chat(args) -> None:
     print_banner()
-    check_cloudflare()
+    check_api_key()
 
-    model = args.model or CF_MODEL
+    model = args.model or OPENAI_MODEL
     if args.method == "cag":
         CAGEngine(KNOWLEDGE_BASE, model=model).interactive()
     else:
@@ -119,10 +115,10 @@ def cmd_chat(args) -> None:
 
 def cmd_ask(args) -> None:
     print_banner()
-    check_cloudflare()
+    check_api_key()
 
     question = args.question
-    model = args.model or CF_MODEL
+    model = args.model or OPENAI_MODEL
     top_k = args.top_k or RAG_TOP_K
     print(f"  Question: {question}\n")
 

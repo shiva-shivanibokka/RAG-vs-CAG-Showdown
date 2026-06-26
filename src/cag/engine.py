@@ -11,7 +11,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import OPENAI_API_KEY, OPENAI_MODEL, MAX_RETRIES, MAX_TOKENS
+from src.config import MAX_RETRIES, MAX_TOKENS, OPENAI_API_KEY, OPENAI_MODEL
 
 logger = logging.getLogger(__name__)
 

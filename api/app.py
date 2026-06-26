@@ -16,7 +16,7 @@ from pydantic import BaseModel, field_validator
 
 from src.benchmark.evaluator import Benchmarker
 from src.cag.engine import CAGEngine
-from src.config import API_ROOT_PATH, CORS_ORIGINS, OPENAI_MODEL, RAG_TOP_K
+from src.config import API_ROOT_PATH, OPENAI_MODEL, RAG_TOP_K
 from src.rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)

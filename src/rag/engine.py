@@ -16,10 +16,10 @@ from fastembed import TextEmbedding
 from openai import AsyncOpenAI, OpenAI
 
 from src.config import (
-    OPENAI_API_KEY,
-    OPENAI_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
+    OPENAI_API_KEY,
+    OPENAI_MODEL,
     RAG_TOP_K,
 )
 
@@ -136,7 +136,7 @@ class RAGEngine:
                 )
         if embeddings is None:
             texts = [c["text"] for c in self.chunks]
-            logger.info("RAG | embedding %d chunks via CF Workers AI...", len(texts))
+            logger.info("RAG | embedding %d chunks via fastembed...", len(texts))
             embeddings = self._embed(texts)
         norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
         self._embeddings = embeddings / np.maximum(norms, 1e-10)
@@ -167,7 +167,7 @@ class RAGEngine:
         return results, retrieval_time
 
     # ------------------------------------------------------------------
-    # Generation (Groq)
+    # Generation (OpenAI-compatible)
     # ------------------------------------------------------------------
 
     def _build_messages(self, question: str, retrieved_chunks: list[dict]) -> list[dict]:
@@ -199,12 +199,12 @@ class RAGEngine:
                 last_exc = exc
                 wait = 2**attempt
                 logger.warning(
-                    "CF AI call failed (attempt %d/%d): %s. Retrying in %ds.",
+                    "AI call failed (attempt %d/%d): %s. Retrying in %ds.",
                     attempt + 1, self._max_retries, exc, wait,
                 )
                 time.sleep(wait)
         raise RuntimeError(
-            f"CF AI call failed after {self._max_retries} attempts: {last_exc}"
+            f"AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
     # ------------------------------------------------------------------

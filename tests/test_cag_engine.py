@@ -5,8 +5,8 @@ import pytest
 from src.cag.engine import CAGEngine
 
 
-def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
-    engine = CAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_returns_correct_keys(tmp_knowledge_base, mock_llm_client):
+    engine = CAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("What is KV cache?")
 
     assert set(result.keys()) == {
@@ -21,28 +21,28 @@ def test_query_returns_correct_keys(tmp_knowledge_base, mock_cf_client):
     }
 
 
-def test_query_answer_text(tmp_knowledge_base, mock_cf_client):
-    engine = CAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_answer_text(tmp_knowledge_base, mock_llm_client):
+    engine = CAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("What is KV cache?")
     assert result["answer"] == "This is a test answer."
 
 
-def test_query_method_is_cag(tmp_knowledge_base, mock_cf_client):
-    engine = CAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_method_is_cag(tmp_knowledge_base, mock_llm_client):
+    engine = CAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("test")
     assert result["method"] == "CAG"
     assert result["retrieved_chunks"] is None
 
 
-def test_query_token_counts(tmp_knowledge_base, mock_cf_client):
-    engine = CAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_token_counts(tmp_knowledge_base, mock_llm_client):
+    engine = CAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("test")
     assert result["input_tokens"] == 150
     assert result["output_tokens"] == 40
 
 
-def test_query_latency_is_positive_float(tmp_knowledge_base, mock_cf_client):
-    engine = CAGEngine(tmp_knowledge_base, _client=mock_cf_client)
+def test_query_latency_is_positive_float(tmp_knowledge_base, mock_llm_client):
+    engine = CAGEngine(tmp_knowledge_base, _client=mock_llm_client)
     result = engine.query("test")
     assert isinstance(result["latency_seconds"], float)
     assert result["latency_seconds"] >= 0.0

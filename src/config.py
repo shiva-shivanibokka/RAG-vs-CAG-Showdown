@@ -9,11 +9,6 @@ load_dotenv()
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-# Cloudflare Workers AI — embeddings only
-CF_ACCOUNT_ID: str = os.getenv("CF_ACCOUNT_ID", "")
-CF_API_TOKEN: str = os.getenv("CF_API_TOKEN", "")
-EMBEDDING_MODEL: str = os.getenv("EMBEDDING_MODEL", "@cf/baai/bge-small-en-v1.5")
-
 RAG_TOP_K: int = int(os.getenv("RAG_TOP_K", "3"))
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "1024"))
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "3"))

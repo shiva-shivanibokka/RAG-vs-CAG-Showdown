@@ -3,7 +3,7 @@
 > **Recruiter TL;DR**
 > - Full-stack LLM benchmarking app that pits Context Augmented Generation against Retrieval Augmented Generation head-to-head on 10 AI/ML questions, scored by an LLM-as-judge in real time
 > - Hardest engineering problem: eliminated all cloud embedding dependencies by running a local ONNX model inside Docker after every major free-tier LLM provider failed due to token/rate limits (Groq 12K TPM cap, Cloudflare 10K neurons/day, Gemini regional quota, Cerebras model-access errors, OpenRouter free-model discontinuation, Together AI billing wall)
-> - In a live tournament run: CAG scored **4.95/5 avg** vs RAG's **3.73/5**, with multi-hop questions showing the widest gap (5/5 vs 1.25/5) — at the cost of 30% higher latency (5.03s vs 3.86s), consistent with CAG's larger prompt
+> - In one tournament run (OpenAI gpt-4o-mini): CAG scored **4.95/5 avg** vs RAG's **3.73/5**, with multi-hop questions showing the widest gap (5/5 vs 1.25/5) — at the cost of 30% higher latency (5.03s vs 3.86s), consistent with CAG's larger prompt. Results vary by model and run.
 
 [![CI](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions/workflows/ci.yml/badge.svg)](https://github.com/shiva-shivanibokka/RAG-vs-CAG-Showdown/actions)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
@@ -130,6 +130,17 @@ flowchart TD
 - Same LLM, third role: scores each answer on 4 dimensions (1–5 each)
 - Correctness, Completeness, Coherence, Groundedness
 - Runs in parallel with `asyncio.gather` for speed
+
+### Prompt design — how each engine uses its context
+
+This is an intentional architectural difference, not a bug:
+
+| | System prompt instruction | Implication |
+|---|---|---|
+| **CAG** | "Answer questions **ONLY** using the information in the KNOWLEDGE BASE below. If the answer is not there, say so." | Strictly grounded in the KB. The LLM cannot draw on its training knowledge — it either finds the answer in the loaded context or admits it doesn't know. |
+| **RAG** | "Answer the question **using** the context chunks provided below. Synthesize information across chunks as needed." | The model uses retrieved chunks as its primary source but is not explicitly forbidden from supplementing with its own training knowledge. This reflects how RAG systems behave in production. |
+
+The consequence: when RAG retrieves thin or off-topic chunks, the model may fill gaps with its pre-trained knowledge rather than saying "I don't know." This means RAG can look better than its retrieval quality deserves on some questions. A future controlled evaluation would restrict both engines to their provided context equally and measure retrieval quality separately (see Roadmap).
 
 ---
 
@@ -460,3 +471,4 @@ CAG-vs-RAG-Showdown/
 - **Upload your own knowledge base** — let visitors paste or upload their own documents and run CAG vs RAG on their own content. This turns the app from a fixed demo into a general-purpose evaluation tool, and makes the context-window constraint tangible for any domain.
 - **Streaming responses** — stream tokens to the UI as they arrive instead of waiting for the full response. CAG's latency disadvantage (~30% slower in the sample tournament) is largely a perception problem at full-document scale; streaming would make it feel much faster.
 - **Advanced RAG techniques** — add re-ranking (Cohere Rerank or a cross-encoder), HyDE (hypothetical document embeddings), or multi-query retrieval to close the accuracy gap. The current RAG pipeline is intentionally simple to make the comparison fair to CAG; a "RAG Pro" mode would show how far retrieval quality can be pushed.
+- **Controlled retrieval evaluation** — the current setup lets RAG supplement thin retrieved chunks with the model's training knowledge (no explicit "ONLY" restriction), which can inflate RAG scores independent of retrieval quality. A controlled mode would restrict both engines to only their provided context and introduce a separate retrieval quality metric (e.g. chunk precision at k), isolating what retrieval actually contributes vs. what the base model already knew.

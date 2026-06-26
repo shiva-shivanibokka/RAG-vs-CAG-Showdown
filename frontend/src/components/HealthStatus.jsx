@@ -119,7 +119,7 @@ export default function HealthStatus() {
               color="emerald"
               items={[
                 'Embeds query → FAISS similarity search',
-                'Top-3 chunks retrieved per query',
+                'Top-5 chunks retrieved per query',
                 'Advantages: scalable, precise, fast',
                 'Weakness: multi-hop, retrieval misses',
               ]}

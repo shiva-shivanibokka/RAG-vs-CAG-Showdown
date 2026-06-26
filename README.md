@@ -361,12 +361,13 @@ This app has two independently deployed pieces: the **backend** (Render, Docker)
    - **Environment:** `Docker`
    - **Branch:** `main`
    - **Plan:** Free
-4. Under **Environment Variables**, add:
+4. Under **Environment Variables**, add (only if you want a server-side fallback key):
 
    | Key | Value | Notes |
    |---|---|---|
-   | `CORS_ORIGINS` | `https://your-app.vercel.app` | Your Vercel URL — **required** to unblock CORS. Set it after step 2 if you don't know it yet; until then the frontend can't call the backend. |
-   | `OPENAI_API_KEY` | *(leave blank)* | Optional server-side fallback. Leave empty — the app is designed for users to supply their own keys. |
+   | `OPENAI_API_KEY` | *(leave blank or omit)* | Optional server-side fallback. Leave empty — the app is designed for users to supply their own keys. |
+
+   No CORS configuration is needed — the backend accepts requests from any origin.
 
 5. Click **Deploy**. The first build takes ~3–5 minutes — Docker pulls Python 3.11, installs dependencies, and pre-downloads the fastembed ONNX model (~22 MB).
 6. Once deployed, note the URL: `https://your-service-name.onrender.com`
@@ -393,15 +394,7 @@ This app has two independently deployed pieces: the **backend** (Render, Docker)
 
 ---
 
-### Step 3 — Wire up CORS
-
-Go back to the Render dashboard → your service → **Environment** → update `CORS_ORIGINS` to the exact Vercel URL from Step 2 (no trailing slash). Render redeploys automatically.
-
-> If you skip this step, the browser will block all API calls with a CORS error.
-
----
-
-### Step 4 — Verify end-to-end
+### Step 3 — Verify end-to-end
 
 1. Open your Vercel URL in a browser
 2. Select a provider and enter an API key
@@ -409,7 +402,7 @@ Go back to the Render dashboard → your service → **Environment** → update 
 4. Go to **Challenge**, pick any topic, click **Fight!**
 5. Both CAG and RAG answers should appear within 5–15 seconds
 
-> **Already have the repo?** The `render.yaml` in the root pre-configures Render — connect your repo and Render will detect it automatically. You still need to set `CORS_ORIGINS` manually since it depends on your Vercel URL.
+> **Already have the repo?** The `render.yaml` in the root pre-configures Render — connect your repo and Render will detect it automatically.
 
 ---
 

@@ -7,7 +7,15 @@ async function request(path, options = {}, llmConfig = null) {
     if (llmConfig.baseUrl) headers['X-OpenAI-Base-URL'] = llmConfig.baseUrl
     if (llmConfig.model)   headers['X-OpenAI-Model']    = llmConfig.model
   }
-  const res = await fetch(`${BASE}${path}`, { headers, ...options })
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, { headers, ...options })
+  } catch {
+    throw new Error(
+      'Cannot reach the backend — the server may be starting up (Render free tier takes ~30s after inactivity). ' +
+      'Check Battle HQ for live status, then retry.'
+    )
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }))
     throw new Error(err.detail || `HTTP ${res.status}`)

@@ -8,8 +8,6 @@ services:
     envVars:
       - key: OPENAI_API_KEY
         sync: false          # optional server-side fallback; leave empty to require user-supplied keys
-      - key: CORS_ORIGINS
-        sync: false          # set to your Vercel URL, e.g. https://rag-vs-cag-showdown.vercel.app
       - key: RAG_TOP_K
         value: "5"
       - key: MAX_TOKENS

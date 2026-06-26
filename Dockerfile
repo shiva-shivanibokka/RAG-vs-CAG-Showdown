@@ -9,9 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source and register the package (deps already installed above)
+# Copy source and register the package
 COPY . .
 RUN pip install --no-cache-dir -e . --no-deps
+
+# Pre-download the fastembed ONNX model so cold starts don't trigger a download
+RUN python -c "from fastembed import TextEmbedding; list(TextEmbedding('BAAI/bge-small-en-v1.5').embed(['warmup']))"
 
 EXPOSE 8000
 

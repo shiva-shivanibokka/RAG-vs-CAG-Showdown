@@ -1,8 +1,8 @@
 """
 RAG Engine — Retrieval Augmented Generation
 ============================================
-Embeddings: Cloudflare Workers AI (@cf/baai/bge-small-en-v1.5) — cheap, stays within free quota
-Text generation: Groq (llama-3.3-70b-versatile) — 14,400 req/day free tier
+Embeddings: fastembed (BAAI/bge-small-en-v1.5, local ONNX — no API calls, no rate limits)
+Text generation: OpenAI-compatible (user-supplied API key per request)
 """
 
 import logging
@@ -12,12 +12,10 @@ from pathlib import Path
 
 import faiss
 import numpy as np
+from fastembed import TextEmbedding
 from openai import AsyncOpenAI, OpenAI
 
 from src.config import (
-    CF_ACCOUNT_ID,
-    CF_API_TOKEN,
-    EMBEDDING_MODEL,
     OPENAI_API_KEY,
     OPENAI_MODEL,
     MAX_RETRIES,
@@ -27,7 +25,7 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
-_CF_BASE_URL = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
+_FASTEMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 # ---------------------------------------------------------------------------
@@ -64,8 +62,8 @@ class RAGEngine:
     """
     Retrieval Augmented Generation.
 
-    Embeddings via CF Workers AI (cheap — only embeddings, no text gen).
-    Text generation via Groq (generous free tier, fast).
+    Embeddings: fastembed BAAI/bge-small-en-v1.5 (local ONNX, zero API calls).
+    Text generation: OpenAI-compatible (user-supplied key per request).
     FAISS index lives in memory.
     """
 
@@ -73,7 +71,6 @@ class RAGEngine:
         self,
         knowledge_base_path: str | Path,
         model: str = OPENAI_MODEL,
-        embedding_model_name: str = EMBEDDING_MODEL,
         top_k: int = RAG_TOP_K,
         max_tokens: int = MAX_TOKENS,
         max_retries: int = MAX_RETRIES,
@@ -81,17 +78,12 @@ class RAGEngine:
         _client=None,
     ):
         self.model = model
-        self.embedding_model_name = embedding_model_name
         self.top_k = top_k
         self.max_tokens = max_tokens
         self._max_retries = max_retries
 
-        # In tests _client handles everything; in production use separate clients.
         self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY or "not-configured")
-        self._embed_client: OpenAI = _client or OpenAI(
-            api_key=CF_API_TOKEN,
-            base_url=_CF_BASE_URL,
-        )
+        self._embedder = TextEmbedding(_FASTEMBED_MODEL)
 
         kb_path = Path(knowledge_base_path)
         if not kb_path.exists():
@@ -103,24 +95,16 @@ class RAGEngine:
 
         index_time = self._build_index()
         logger.info(
-            "RAG | FAISS index built in %.3fs | embedding=%s | top_k=%d",
-            index_time, embedding_model_name, top_k,
+            "RAG | FAISS index built in %.3fs | model=%s | top_k=%d",
+            index_time, _FASTEMBED_MODEL, top_k,
         )
 
     # ------------------------------------------------------------------
-    # Embedding (CF Workers AI)
+    # Embedding (fastembed — local ONNX, no API, no rate limits)
     # ------------------------------------------------------------------
 
     def _embed(self, texts: list[str]) -> np.ndarray:
-        all_embeddings: list[list[float]] = []
-        for i in range(0, len(texts), 10):
-            batch = texts[i : i + 10]
-            resp = self._embed_client.embeddings.create(
-                model=self.embedding_model_name,
-                input=batch,
-            )
-            all_embeddings.extend(item.embedding for item in resp.data)
-        return np.array(all_embeddings, dtype=np.float32)
+        return np.array(list(self._embedder.embed(texts)), dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Indexing

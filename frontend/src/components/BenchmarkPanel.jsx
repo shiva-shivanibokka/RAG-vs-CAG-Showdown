@@ -90,6 +90,36 @@ export default function BenchmarkPanel() {
       )}
 
       {results && <ResultsView data={results} />}
+
+      {/* judge explanation */}
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-5 space-y-3">
+        <p className="text-sm font-bold text-gray-700">🧑‍⚖️ How the LLM Judge works</p>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          The judge is the same LLM (Llama 3.3 70B on Cloudflare Workers AI) used to generate answers —
+          but called a third time per question, acting as an independent evaluator.
+          It receives the question, the answer, and a list of expected concepts it should look for,
+          then returns scores across four dimensions:
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            ['Correctness',  'Are the facts accurate?'],
+            ['Completeness', 'Are expected concepts covered?'],
+            ['Coherence',    'Is the answer clear and structured?'],
+            ['Groundedness', 'Is it specific, not vague?'],
+          ].map(([dim, desc]) => (
+            <div key={dim} className="bg-white rounded-xl border border-gray-200 p-3">
+              <p className="text-xs font-bold text-gray-800">{dim}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+              <p className="text-xs text-gray-500 mt-1">Scored 1–5</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-gray-400">
+          Total = average of the four scores. Each question also has a list of expected concepts
+          (e.g. "KV cache, precomputation, latency") that the judge checks coverage against.
+          CAG and RAG answers are scored independently — the judge does not compare them directly.
+        </p>
+      </div>
     </div>
   )
 }

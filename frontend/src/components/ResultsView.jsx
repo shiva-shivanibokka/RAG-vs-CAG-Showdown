@@ -207,12 +207,26 @@ function DetailCard({ title, color, result }) {
         <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{result.answer}</p>
 
         {scores.total !== undefined && (
-          <div className={`${scoreBg} rounded-lg p-3 grid grid-cols-2 gap-1.5 text-xs ${scoreText}`}>
-            <ScoreRow label="Correctness"  value={scores.correctness} />
-            <ScoreRow label="Completeness" value={scores.completeness} />
-            <ScoreRow label="Coherence"    value={scores.coherence} />
-            <ScoreRow label="Groundedness" value={scores.groundedness} />
-            <div className="col-span-2 border-t border-current/20 pt-1.5 mt-0.5 flex justify-between font-black">
+          <div className={`${scoreBg} rounded-lg p-3 space-y-1.5 text-xs ${scoreText}`}>
+            {[
+              ['Correctness',  scores.correctness],
+              ['Completeness', scores.completeness],
+              ['Coherence',    scores.coherence],
+              ['Groundedness', scores.groundedness],
+            ].map(([label, val]) => (
+              <div key={label} className="flex items-center justify-between gap-2">
+                <span className="opacity-70 shrink-0">{label}</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => (
+                      <div key={i} className={`w-2 h-2 rounded-full ${i <= (val ?? 0) ? 'bg-current' : 'bg-current opacity-20'}`} />
+                    ))}
+                  </div>
+                  <span className="font-black w-3 text-right">{val ?? '—'}</span>
+                </div>
+              </div>
+            ))}
+            <div className="border-t border-current/20 pt-1.5 flex justify-between font-black text-sm">
               <span>Total</span>
               <span>{scores.total} / 5</span>
             </div>

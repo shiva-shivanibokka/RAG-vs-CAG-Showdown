@@ -1,9 +1,8 @@
 """
-RAG Engine — Retrieval Augmented Generation (Cloudflare Workers AI backend)
-===========================================================================
-1. Index: chunk -> embed via CF Workers AI API -> FAISS (in-memory)
-2. Query: embed question via CF API -> top-k retrieval -> CF AI generation
-No local embedding model or onnxruntime — zero extra memory.
+RAG Engine — Retrieval Augmented Generation
+============================================
+Embeddings: Cloudflare Workers AI (@cf/baai/bge-small-en-v1.5) — cheap, stays within free quota
+Text generation: Groq (llama-3.3-70b-versatile) — 14,400 req/day free tier
 """
 
 import logging
@@ -18,8 +17,10 @@ from openai import AsyncOpenAI, OpenAI
 from src.config import (
     CF_ACCOUNT_ID,
     CF_API_TOKEN,
-    CF_MODEL,
     EMBEDDING_MODEL,
+    GROQ_API_KEY,
+    GROQ_BASE_URL,
+    GROQ_MODEL,
     MAX_RETRIES,
     MAX_TOKENS,
     RAG_TOP_K,
@@ -27,9 +28,7 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
-_CF_BASE_URL = (
-    f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
-)
+_CF_BASE_URL = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +37,6 @@ _CF_BASE_URL = (
 
 
 def chunk_by_topic(text: str) -> list[dict]:
-    """Split on === TOPIC: ... === markers. Returns list of {title, text} dicts."""
     pattern = r"={3,}\nTOPIC: (.+?)\n={3,}\n(.*?)(?=={3,}\nTOPIC:|\Z)"
     matches = re.findall(pattern, text, re.DOTALL)
     return [
@@ -49,7 +47,6 @@ def chunk_by_topic(text: str) -> list[dict]:
 
 
 def chunk_fixed_size(text: str, chunk_size: int = 400, overlap: int = 50) -> list[dict]:
-    """Sliding-window word chunking with overlap."""
     words = text.split()
     step = max(1, chunk_size - overlap)
     chunks = []
@@ -66,16 +63,17 @@ def chunk_fixed_size(text: str, chunk_size: int = 400, overlap: int = 50) -> lis
 
 class RAGEngine:
     """
-    Retrieval Augmented Generation backed by FAISS + Cloudflare Workers AI.
+    Retrieval Augmented Generation.
 
-    Embeddings are computed via the CF Workers AI embeddings API (no local
-    model / onnxruntime). FAISS index lives in memory for fast retrieval.
+    Embeddings via CF Workers AI (cheap — only embeddings, no text gen).
+    Text generation via Groq (generous free tier, fast).
+    FAISS index lives in memory.
     """
 
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = CF_MODEL,
+        model: str = GROQ_MODEL,
         embedding_model_name: str = EMBEDDING_MODEL,
         top_k: int = RAG_TOP_K,
         max_tokens: int = MAX_TOKENS,
@@ -88,7 +86,13 @@ class RAGEngine:
         self.top_k = top_k
         self.max_tokens = max_tokens
         self._max_retries = max_retries
+
+        # In tests _client handles everything; in production use separate clients.
         self._client: OpenAI = _client or OpenAI(
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
+        )
+        self._embed_client: OpenAI = _client or OpenAI(
             api_key=CF_API_TOKEN,
             base_url=_CF_BASE_URL,
         )
@@ -99,29 +103,23 @@ class RAGEngine:
 
         raw_text = kb_path.read_text(encoding="utf-8")
         self.chunks = self._chunk(raw_text, chunking_strategy)
-        logger.info(
-            "RAG | %d chunks created (strategy: %s)", len(self.chunks), chunking_strategy
-        )
+        logger.info("RAG | %d chunks (strategy: %s)", len(self.chunks), chunking_strategy)
 
         index_time = self._build_index()
         logger.info(
-            "RAG | FAISS index built in %.3fs | embedding_model=%s | top_k=%d",
-            index_time,
-            embedding_model_name,
-            top_k,
+            "RAG | FAISS index built in %.3fs | embedding=%s | top_k=%d",
+            index_time, embedding_model_name, top_k,
         )
 
     # ------------------------------------------------------------------
-    # Embedding via CF Workers AI
+    # Embedding (CF Workers AI)
     # ------------------------------------------------------------------
 
     def _embed(self, texts: list[str]) -> np.ndarray:
-        """Call CF Workers AI embeddings API. Batches up to 10 texts at a time."""
         all_embeddings: list[list[float]] = []
-        batch_size = 10
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            resp = self._client.embeddings.create(
+        for i in range(0, len(texts), 10):
+            batch = texts[i : i + 10]
+            resp = self._embed_client.embeddings.create(
                 model=self.embedding_model_name,
                 input=batch,
             )
@@ -136,9 +134,7 @@ class RAGEngine:
         if strategy == "topic":
             chunks = chunk_by_topic(text)
             if len(chunks) < 3:
-                logger.warning(
-                    "Too few topic chunks (%d); falling back to fixed-size.", len(chunks)
-                )
+                logger.warning("Too few topic chunks (%d); falling back to fixed.", len(chunks))
                 chunks = chunk_fixed_size(text)
         else:
             chunks = chunk_fixed_size(text)
@@ -163,12 +159,9 @@ class RAGEngine:
     def _retrieve(self, question: str) -> tuple[list[dict], float]:
         start = time.perf_counter()
         q_emb = self._embed([question])
-        q_norm = q_emb / np.maximum(
-            np.linalg.norm(q_emb, axis=1, keepdims=True), 1e-10
-        )
+        q_norm = q_emb / np.maximum(np.linalg.norm(q_emb, axis=1, keepdims=True), 1e-10)
         scores, indices = self._index.search(q_norm.astype(np.float32), self.top_k)
         retrieval_time = time.perf_counter() - start
-
         results = [
             {
                 "title": self.chunks[idx]["title"],
@@ -181,7 +174,7 @@ class RAGEngine:
         return results, retrieval_time
 
     # ------------------------------------------------------------------
-    # Generation
+    # Generation (Groq)
     # ------------------------------------------------------------------
 
     def _build_messages(self, question: str, retrieved_chunks: list[dict]) -> list[dict]:
@@ -194,8 +187,10 @@ class RAGEngine:
             "If the answer is not in the context, say 'The retrieved context does not contain "
             "enough information to answer this question.'\n\nBe precise and reference the chunks."
         )
-        user = f"CONTEXT:\n{context}\n\nQUESTION: {question}"
-        return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"CONTEXT:\n{context}\n\nQUESTION: {question}"},
+        ]
 
     def _chat(self, messages: list[dict]) -> object:
         last_exc: Exception | None = None
@@ -211,10 +206,7 @@ class RAGEngine:
                 wait = 2**attempt
                 logger.warning(
                     "CF AI call failed (attempt %d/%d): %s. Retrying in %ds.",
-                    attempt + 1,
-                    self._max_retries,
-                    exc,
-                    wait,
+                    attempt + 1, self._max_retries, exc, wait,
                 )
                 time.sleep(wait)
         raise RuntimeError(
@@ -226,10 +218,8 @@ class RAGEngine:
     # ------------------------------------------------------------------
 
     def query(self, question: str) -> dict:
-        """Retrieve top-k chunks and generate an answer."""
         total_start = time.perf_counter()
         retrieved_chunks, retrieval_latency = self._retrieve(question)
-
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
         response = self._chat(messages)
@@ -253,13 +243,11 @@ class RAGEngine:
         }
 
     async def query_async(self, question: str) -> dict:
-        """Async version — retrieval is sync (local FAISS), only generation is async."""
         total_start = time.perf_counter()
         retrieved_chunks, retrieval_latency = self._retrieve(question)
-
         messages = self._build_messages(question, retrieved_chunks)
         gen_start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=CF_API_TOKEN, base_url=_CF_BASE_URL)
+        async_client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -289,7 +277,6 @@ class RAGEngine:
         print(f"  RAG Interactive Session  (model: {self.model})")
         print("  Type 'quit' or 'exit' to stop")
         print("=" * 60 + "\n")
-
         while True:
             try:
                 question = input("You: ").strip()
@@ -301,7 +288,6 @@ class RAGEngine:
             if question.lower() in {"quit", "exit", "q"}:
                 print("Goodbye.")
                 break
-
             result = self.query(question)
             print(f"\nRAG: {result['answer']}")
             print(

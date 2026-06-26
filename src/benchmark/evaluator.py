@@ -16,13 +16,11 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import CF_ACCOUNT_ID, CF_API_TOKEN, CF_MODEL, MAX_RETRIES
+from src.config import GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL, MAX_RETRIES
 
 logger = logging.getLogger(__name__)
 
-_CF_BASE_URL = (
-    f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
-)
+_GROQ_BASE_URL = GROQ_BASE_URL
 
 # ---------------------------------------------------------------------------
 # Default benchmark questions
@@ -122,15 +120,15 @@ class LLMJudge:
 
     def __init__(
         self,
-        judge_model: str = CF_MODEL,
+        judge_model: str = GROQ_MODEL,
         max_retries: int = MAX_RETRIES,
         _client=None,
     ):
         self.judge_model = judge_model
         self._max_retries = max_retries
         self._client: OpenAI = _client or OpenAI(
-            api_key=CF_API_TOKEN,
-            base_url=_CF_BASE_URL,
+            api_key=GROQ_API_KEY,
+            base_url=_GROQ_BASE_URL,
         )
 
     def _parse_judge_response(self, raw: str) -> dict:
@@ -190,7 +188,7 @@ class LLMJudge:
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
-                async_client = AsyncOpenAI(api_key=CF_API_TOKEN, base_url=_CF_BASE_URL)
+                async_client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=_GROQ_BASE_URL)
                 response = await async_client.chat.completions.create(
                     model=self.judge_model,
                     messages=messages,

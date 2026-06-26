@@ -1,6 +1,6 @@
 """
-CAG Engine — Context Augmented Generation (Cloudflare Workers AI backend)
-=========================================================================
+CAG Engine — Context Augmented Generation (Groq backend)
+=========================================================
 Loads the entire knowledge base into the LLM context window.
 No retrieval step. No vector database. No chunking.
 """
@@ -11,39 +11,23 @@ from pathlib import Path
 
 from openai import AsyncOpenAI, OpenAI
 
-from src.config import CF_ACCOUNT_ID, CF_API_TOKEN, CF_MODEL, MAX_RETRIES, MAX_TOKENS
+from src.config import GROQ_API_KEY, GROQ_BASE_URL, GROQ_MODEL, MAX_RETRIES, MAX_TOKENS
 
 logger = logging.getLogger(__name__)
-
-_CF_BASE_URL = (
-    f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/v1"
-)
 
 
 class CAGEngine:
     """
-    Context Augmented Generation engine backed by Cloudflare Workers AI.
+    Context Augmented Generation engine backed by Groq.
 
     The full knowledge base is placed in the system prompt once at startup.
     Every query sends only the question — the context is already loaded.
-
-    Parameters
-    ----------
-    knowledge_base_path : str | Path
-    model : str
-        Cloudflare Workers AI model tag, e.g. "@cf/meta/llama-3.1-8b-instruct".
-    max_tokens : int
-        Maximum tokens to generate.
-    max_retries : int
-        Retry attempts on transient failures.
-    _client : optional
-        Injected OpenAI-compatible client — used in tests to avoid live API calls.
     """
 
     def __init__(
         self,
         knowledge_base_path: str | Path,
-        model: str = CF_MODEL,
+        model: str = GROQ_MODEL,
         max_tokens: int = MAX_TOKENS,
         max_retries: int = MAX_RETRIES,
         _client=None,
@@ -52,8 +36,8 @@ class CAGEngine:
         self.max_tokens = max_tokens
         self._max_retries = max_retries
         self._client: OpenAI = _client or OpenAI(
-            api_key=CF_API_TOKEN,
-            base_url=_CF_BASE_URL,
+            api_key=GROQ_API_KEY,
+            base_url=GROQ_BASE_URL,
         )
 
         kb_path = Path(knowledge_base_path)
@@ -69,10 +53,6 @@ class CAGEngine:
             self.model,
         )
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-
     def _build_system_prompt(self) -> str:
         return (
             "You are an expert AI/ML assistant. Answer questions ONLY using the "
@@ -83,7 +63,6 @@ class CAGEngine:
         )
 
     def _chat(self, messages: list[dict]) -> object:
-        """Call Cloudflare Workers AI with exponential-backoff retry."""
         last_exc: Exception | None = None
         for attempt in range(self._max_retries):
             try:
@@ -107,12 +86,7 @@ class CAGEngine:
             f"CF AI call failed after {self._max_retries} attempts: {last_exc}"
         ) from last_exc
 
-    # ------------------------------------------------------------------
-    # Public interface
-    # ------------------------------------------------------------------
-
     def query(self, question: str) -> dict:
-        """Answer a question using the full preloaded knowledge base context."""
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
@@ -133,13 +107,12 @@ class CAGEngine:
         }
 
     async def query_async(self, question: str) -> dict:
-        """Async version — used by the parallel benchmark runner."""
         messages = [
             {"role": "system", "content": self._system_prompt},
             {"role": "user", "content": question},
         ]
         start = time.perf_counter()
-        async_client = AsyncOpenAI(api_key=CF_API_TOKEN, base_url=_CF_BASE_URL)
+        async_client = AsyncOpenAI(api_key=GROQ_API_KEY, base_url=GROQ_BASE_URL)
         response = await async_client.chat.completions.create(
             model=self.model,
             messages=messages,
@@ -159,7 +132,6 @@ class CAGEngine:
         }
 
     def interactive(self) -> None:
-        """Launch an interactive Q&A session in the terminal."""
         print("\n" + "=" * 60)
         print(f"  CAG Interactive Session  (model: {self.model})")
         print("  Type 'quit' or 'exit' to stop")
@@ -171,7 +143,6 @@ class CAGEngine:
             except (KeyboardInterrupt, EOFError):
                 print("\nExiting.")
                 break
-
             if not question:
                 continue
             if question.lower() in {"quit", "exit", "q"}:

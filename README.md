@@ -62,6 +62,8 @@ All providers use the same OpenAI-compatible REST API format. The app sends `X-O
 
 > **Why 13,500 tokens?** CAG loads all 30 knowledge base topics into a single LLM call. That's the cost of the "no retrieval" approach — the provider must accept one large request.
 
+> **If you get an error:** The pipeline itself is not broken. Errors almost always come from the LLM provider — rate limits, quota exhaustion, or token caps on a free tier. A paid API key (OpenAI, OpenRouter) will not produce these errors under normal usage. If you're on a free tier and CAG fails, try RAG-only first; it uses ~2,000 tokens per request instead of 13,500.
+
 ### Cost estimate (OpenAI gpt-4o-mini rates)
 
 | Action | Tokens | Approx. cost |

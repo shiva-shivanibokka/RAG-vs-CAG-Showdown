@@ -126,7 +126,7 @@ class LLMJudge:
         self.judge_model = judge_model
         self._max_retries = max_retries
         self._api_key = api_key
-        self._client: OpenAI = _client or OpenAI(api_key=api_key or OPENAI_API_KEY)
+        self._client: OpenAI = _client or OpenAI(api_key=api_key or OPENAI_API_KEY or "not-configured")
 
     def _parse_judge_response(self, raw: str) -> dict:
         """Strip markdown fences, parse JSON, validate required fields, add total."""

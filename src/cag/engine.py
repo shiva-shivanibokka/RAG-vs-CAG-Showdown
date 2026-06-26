@@ -28,7 +28,7 @@ class CAGEngine:
         self.model = model
         self.max_tokens = max_tokens
         self._max_retries = max_retries
-        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY)
+        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY or "not-configured")
 
         kb_path = Path(knowledge_base_path)
         if not kb_path.exists():

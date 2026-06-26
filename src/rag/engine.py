@@ -87,7 +87,7 @@ class RAGEngine:
         self._max_retries = max_retries
 
         # In tests _client handles everything; in production use separate clients.
-        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY)
+        self._client: OpenAI = _client or OpenAI(api_key=OPENAI_API_KEY or "not-configured")
         self._embed_client: OpenAI = _client or OpenAI(
             api_key=CF_API_TOKEN,
             base_url=_CF_BASE_URL,

@@ -566,3 +566,600 @@ Alignment concepts:
 - Scalable oversight: Using AI to help humans supervise more capable AI
 
 ================================================================================
+
+================================================================================
+TOPIC: Scaling Laws and Emergent Abilities
+================================================================================
+Scaling laws describe predictable, power-law relationships between model
+performance and three variables: model size (parameters), dataset size (tokens),
+and compute budget (FLOPs). Understanding scaling laws is essential for making
+architectural decisions in both CAG and RAG systems.
+
+Chinchilla Scaling Laws (Hoffmann et al., 2022):
+The landmark Chinchilla paper showed that most LLMs prior to 2022 were
+undertrained relative to their size. The optimal compute allocation follows:
+  N_opt proportional to C^0.5  (model parameters)
+  D_opt proportional to C^0.5  (training tokens)
+
+Key finding: For a fixed compute budget C, the optimal model has N parameters
+trained on D = 20 * N tokens. GPT-3 (175B params, 300B tokens) was significantly
+undertrained; a compute-optimal model would be ~70B params on 1.4T tokens.
+
+Implications:
+- Chinchilla-optimal models are smaller but better at inference time
+- Llama models follow Chinchilla scaling, making them more efficient for CAG
+  (smaller models fit larger context windows within memory budgets)
+- RAG benefits from smaller, faster models since latency compounds across
+  retrieval + generation steps
+
+Neural Scaling Laws (Kaplan et al., 2020 - OpenAI):
+  L(N) proportional to N^(-0.076)  (loss vs parameters)
+  L(D) proportional to D^(-0.095)  (loss vs data)
+  L(C) proportional to C^(-0.050)  (loss vs compute)
+
+These laws hold across many orders of magnitude and suggest deep regularities
+in how neural networks learn from data.
+
+Emergent Abilities:
+Emergent abilities are capabilities that appear abruptly at scale and are absent
+in smaller models. They cannot be predicted by extrapolating small-model performance.
+Examples:
+- Chain-of-thought reasoning: Emerges around 100B parameters
+- Multi-step arithmetic: Emerges around 100B parameters
+- Multi-hop reasoning: Improves dramatically at scale (critical for CAG)
+- In-context learning: Stronger few-shot performance at larger scales
+
+Controversy: Wei et al. (2022) documented emergent abilities. Schaeffer et al.
+(2023) argued they are a measurement artifact: when using smooth metrics instead
+of binary accuracy, abilities appear to improve continuously, not suddenly.
+
+Implications for CAG vs RAG:
+- Larger models exploit CAG better: multi-hop reasoning over full context
+  improves disproportionately with scale
+- Smaller models may prefer RAG: focused retrieval compensates for limited
+  reasoning capacity over long contexts
+- Emergent in-context learning makes very large models better at CAG-style
+  synthesis across a full knowledge base
+
+================================================================================
+TOPIC: Advanced RAG Techniques
+================================================================================
+Vanilla RAG (retrieve top-k, generate) has well-documented failure modes.
+Advanced RAG techniques address these with iterative refinement, better
+retrieval strategies, and self-correction. Understanding these is essential
+for a fair comparison against CAG.
+
+HyDE (Hypothetical Document Embeddings):
+Instead of embedding the raw query, the LLM first generates a hypothetical
+answer document, then embeds that document for retrieval. A generated answer
+is more semantically similar to relevant documents than the original query.
+  Query -> LLM generates hypothetical doc -> embed doc -> retrieve similar docs
+Benefit: Bridges the vocabulary gap between queries and documents.
+Limitation: Adds one full LLM call before retrieval, increasing latency and cost.
+Comparison: CAG has no retrieval step at all, so HyDE overhead makes CAG
+relatively more attractive for latency-sensitive applications.
+
+Self-RAG (Asai et al., 2023):
+Trains the LLM to decide when to retrieve and how to use retrieved content.
+The model generates special reflection tokens:
+  [Retrieve]: Should I retrieve?
+  [Relevant]: Is the retrieved doc relevant?
+  [Supported]: Is my generation supported by the doc?
+  [Useful]: Is my response useful?
+Benefit: Avoids unnecessary retrieval, improves faithfulness.
+Cost: Requires fine-tuning the LLM itself, not just the retrieval pipeline.
+
+CRAG (Corrective RAG):
+Adds a retrieval evaluator that assesses whether retrieved documents are
+relevant. If relevance is low, it falls back to web search or other sources.
+
+RAPTOR (Recursive Abstractive Processing for Tree Organized Retrieval):
+Builds a hierarchical tree of document summaries:
+1. Cluster leaf nodes (original chunks) using UMAP + Gaussian Mixture Models
+2. Summarize each cluster with an LLM
+3. Repeat recursively to build a tree
+4. At query time, retrieve from any level of the tree
+
+RAPTOR specifically addresses multi-hop questions, a key weakness vs CAG.
+By pre-building summaries that synthesize across chunks, RAPTOR narrows
+(but does not eliminate) CAG's multi-hop advantage.
+
+RAG Fusion:
+Generates multiple search queries from one user query, retrieves for each,
+then uses reciprocal rank fusion (RRF) to combine ranked lists:
+  User query -> generate N sub-queries -> N retrievals -> RRF -> generate
+Benefit: More robust retrieval, captures different aspects of complex questions.
+
+Iterative / ReAct-RAG:
+The LLM interleaves reasoning and retrieval in multiple steps:
+  Think -> Retrieve -> Think -> Retrieve -> ... -> Answer
+Closes the gap with CAG on multi-hop reasoning but adds significant latency.
+Each additional retrieval step adds roughly 200-500ms, making CAG
+latency-competitive for questions requiring 3+ retrieval rounds.
+
+Key takeaway:
+Advanced RAG techniques narrow the CAG advantage on multi-hop questions but
+each adds latency, complexity, or fine-tuning requirements. CAG's architectural
+simplicity remains a meaningful advantage even compared to enhanced RAG systems.
+
+================================================================================
+TOPIC: Long-Context Models and the Lost-in-the-Middle Problem
+================================================================================
+CAG's core premise -- that putting everything in context is better than
+retrieving a subset -- depends on whether LLMs can use information uniformly
+across very long contexts. Research shows they often cannot.
+
+The Lost-in-the-Middle Problem (Liu et al., 2023):
+In a landmark study, Liu et al. showed that LLM performance on multi-document
+QA degrades significantly when relevant information is in the middle of a
+long context. Models perform best when relevant information is at the
+beginning or end of the context window.
+
+Experimental results:
+- 10 documents, answer at position 1 (beginning): ~70% accuracy
+- 10 documents, answer at position 5 (middle):    ~45% accuracy
+- 10 documents, answer at position 10 (end):      ~68% accuracy
+- Effect worsens with more documents (20, 30 documents)
+
+Implications for CAG:
+This is CAG's most significant empirical weakness. When a knowledge base is
+loaded as a long context, information in the middle sections may be effectively
+ignored. A well-designed RAG system that retrieves the precise relevant chunk
+and places it at the beginning of a short prompt can outperform CAG on
+specific factual questions.
+
+Mitigation strategies for CAG:
+1. Reorder knowledge base: Put most-queried topics first and last
+2. Use topic headings to help the model navigate the context
+3. Use models with explicit long-context training (Claude 3, Gemini 1.5)
+4. KV cache mitigates compute cost but not attention distribution issues
+
+Models with strong long-context support:
+- Claude 3 (Anthropic): 200K tokens, ~99% recall in needle tests
+- Gemini 1.5 Pro (Google): 1M tokens, 99.7% recall
+- GPT-4 Turbo: 128K tokens, some degradation in middle positions
+- LLaMA 3.1: 128K tokens with RoPE scaling
+
+Needle-in-a-Haystack test:
+A benchmark hiding a specific fact at various positions in a long filler
+context. The model is asked to recall the fact. Strong models score above 99%
+across all positions; weaker models show the U-shaped performance curve.
+
+Context window vs effective context window:
+A model may have a 128K token window but reliably use only the first and
+last ~16K tokens. The effective context window is the range over which
+retrieval accuracy remains above a threshold (e.g., 90%).
+
+Critical comparison point:
+For knowledge bases where the lost-in-the-middle effect is significant, RAG
+(which places retrieved content at the beginning of a short prompt) can
+outperform CAG despite having less total information. This is a definitive
+RAG win scenario.
+
+================================================================================
+TOPIC: Position Encoding: RoPE, ALiBi, and Long-Context Scaling
+================================================================================
+Position encodings give Transformers knowledge of token order. The choice of
+position encoding directly determines the maximum effective context window,
+a critical factor for CAG's viability at scale.
+
+Original Sinusoidal Encoding (Vaswani et al., 2017):
+  PE(pos, 2i)   = sin(pos / 10000^(2i/d_model))
+  PE(pos, 2i+1) = cos(pos / 10000^(2i/d_model))
+Fixed, absolute, added to input embeddings. Does not generalize beyond training
+length. Not suitable for long-context models.
+
+RoPE (Rotary Position Embedding) used by LLaMA, Mistral, Gemma:
+Encodes position by rotating query and key vectors in 2D subspaces:
+  q_m = R_m * q    k_n = R_n * k
+where R is a rotation matrix parameterized by position.
+
+Key properties:
+- Relative positions emerge from dot products: the inner product of R_m*q and
+  R_n*k depends only on (m-n), the relative distance between tokens
+- Extrapolation: Models can attend beyond training length via YaRN and RoPE scaling
+- Used in: LLaMA 1/2/3, Mistral, Falcon, Qwen
+
+RoPE scaling for long-context:
+LLaMA 3.1 extends to 128K tokens by scaling RoPE's base frequency theta. This
+allows models trained on shorter sequences to generalize to longer ones, enabling
+CAG on larger knowledge bases without full retraining.
+
+ALiBi (Attention with Linear Biases) used by MPT, BLOOM:
+Adds a bias to attention scores based on relative distance:
+  Attention_bias(i, j) = -m * |i - j|
+where m is a head-specific slope.
+- Extrapolates well to lengths beyond training
+- More memory-efficient than RoPE for very long sequences
+- Does NOT store position in the residual stream, only in attention
+
+Impact on CAG vs RAG:
+- RoPE and ALiBi enable context windows up to 1M+ tokens
+- Larger windows mean larger knowledge bases can use CAG
+- However, architectural support for long context does not automatically fix
+  the lost-in-the-middle problem; attention quality at extreme lengths
+  varies significantly by model
+- RAG is position-encoding-agnostic: it always operates on a short context
+
+================================================================================
+TOPIC: Inference Optimization: vLLM, Speculative Decoding, Continuous Batching
+================================================================================
+Inference optimization directly impacts CAG vs RAG latency trade-offs in
+production. CAG's KV cache advantage depends on efficient cache management;
+RAG's latency overhead can be mitigated by fast generation infrastructure.
+
+PagedAttention and vLLM (Kwon et al., 2023):
+Inspired by virtual memory in operating systems, PagedAttention divides the
+KV cache into pages (blocks) that need not be contiguous in memory, eliminating
+fragmentation. Traditional KV cache allocation causes roughly 60% waste.
+
+Benefits:
+- Cache utilization increases from ~40% to ~96%
+- Prefix caching: Multiple queries sharing the same system prompt or knowledge
+  base reuse cached KV pairs across requests
+- This directly implements CAG's KV cache optimization at the server level
+- A 10K-token knowledge base cached in vLLM makes each new query cost
+  approximately the same as querying an empty context
+
+Continuous Batching (Orca, Yu et al., 2022):
+Traditional batching waits for all sequences to finish before starting the next
+batch. Continuous batching inserts new requests as soon as any slot finishes.
+- Dramatically improves GPU utilization
+- Reduces queuing latency for RAG systems under load
+- Particularly beneficial for RAG where generation lengths are unpredictable
+
+Speculative Decoding:
+Uses a small draft model to propose K tokens at once; the large target model
+verifies them in a single forward pass. Accepted tokens are output immediately.
+- Speed-up: 2-3x for standard generation
+- More impactful for CAG (larger contexts benefit more from speculative assistance)
+
+Impact on the CAG vs RAG comparison:
+vLLM's prefix caching is the closest production equivalent to CAG's KV cache
+optimization. Without prefix caching infrastructure, CAG's first-query latency
+is significantly higher than RAG's. With prefix caching, CAG becomes
+latency-competitive for repeat queries over the same knowledge base.
+
+================================================================================
+TOPIC: Quantization and Model Compression
+================================================================================
+Model compression reduces memory footprint and inference cost, which directly
+affects the feasibility of CAG (needs large KV caches) and RAG (benefits from
+fast, cheap generation).
+
+Data types for inference:
+- FP32: Full precision, rarely used for inference
+- FP16 / BF16: Standard for GPU inference
+- INT8: 2x memory reduction, less than 1% quality loss on most tasks
+- INT4: 4x memory reduction, slightly more degradation
+- NF4 (4-bit NormalFloat): Used in QLoRA, theoretically optimal for normally
+  distributed weights
+
+Post-Training Quantization (PTQ):
+- GPTQ: Layer-wise quantization minimizing weight reconstruction error. Widely
+  used for open-source LLMs. Models available for LLaMA, Mistral, Falcon.
+- AWQ (Lin et al., 2023): Identifies ~1% of salient weights and protects them
+  from quantization. Better than GPTQ on reasoning tasks. Used in production.
+- SmoothQuant: Migrates quantization difficulty from activations to weights.
+  Enables INT8 quantization of both weights and activations simultaneously.
+- GGUF (llama.cpp): Quantized format for CPU inference. Enables running 70B
+  models on consumer hardware at INT4.
+
+Quantization-Aware Training (QAT):
+Model is trained with simulated quantization in the forward pass. More accurate
+than PTQ but requires retraining. Used by Google for on-device models.
+
+Knowledge Distillation:
+Train a smaller student model to mimic a larger teacher model's outputs.
+- DistilBERT: 40% smaller, 60% faster, 97% of BERT performance
+- TinyLLaMA: 1.1B parameters distilled to match much larger models on benchmarks
+
+Impact on CAG:
+INT4 quantization of a 70B model makes it fit in ~35GB VRAM instead of ~140GB.
+A single consumer GPU (e.g., RTX 4090, 24GB) can run a quantized 13B model
+with a large CAG context. Without quantization, large-KB CAG requires data
+center hardware.
+
+Impact on RAG:
+Smaller quantized models generate faster, reducing RAG's generation latency.
+Embedding models like all-MiniLM-L6-v2 are already compact and rarely need
+further quantization.
+
+================================================================================
+TOPIC: Production Deployment Trade-offs: CAG vs RAG Synthesis
+================================================================================
+NOTE: This topic requires synthesizing content from KV Cache, Chunking
+Strategies, Scaling Laws, Inference Optimization, and Long-Context Models.
+A question requiring all five simultaneously cannot be answered from any
+single retrieved chunk -- this is a deliberate multi-hop trap for RAG.
+
+Latency analysis:
+CAG latency = prefill(full_KB) + generation(question)
+  First query: Full KB prefill + generation, 2-10s for a 10K token KB
+  Subsequent queries with vLLM prefix cache: Question tokens + generation, ~0.5-2s
+
+RAG latency = embed(question) + vector_search + generation(question | top_k_chunks)
+  Embedding (all-MiniLM-L6-v2): ~10-50ms
+  Vector search (FAISS in-memory): ~1-5ms
+  Generation (short context): ~0.5-2s
+  Total: ~0.5-2.1s per query, largely independent of KB size
+
+Verdict on latency: RAG has more predictable latency. CAG without KV cache
+is slower for large KBs. With vLLM prefix caching, CAG matches or beats RAG
+for subsequent queries.
+
+Cost analysis (API-based LLMs):
+CAG: 10K-token KB, 1,000 queries/day = 10M input tokens/day
+RAG: Top-k chunks (~300-1000 tokens), same load = 300K-1M input tokens/day
+  RAG is 10-30x cheaper at scale without KV cache.
+  With KV cache hits (no charge from many providers): CAG is cost-competitive.
+
+Accuracy trade-offs:
+Multi-hop questions: CAG wins (full synthesis available)
+Single-hop factual, small static KB: CAG wins (no retrieval errors)
+Single-hop factual, precise lookup: RAG can win (avoids lost-in-the-middle)
+Very large KB exceeding context window: RAG wins (CAG is impossible)
+Frequently updated KB: RAG wins (incremental index updates)
+
+Maintainability:
+CAG: Updating KB = editing a text file. No index rebuild, no re-embedding.
+RAG: Updating KB = re-chunk + re-embed + update vector index. More complex,
+  especially with heterogeneous document types (PDF, HTML, tables, code).
+
+The optimal production design:
+Use CAG for multi-hop synthesis, RAG for targeted factual lookups at scale.
+Route incoming queries to the right system using a lightweight classifier.
+This is called Adaptive RAG and represents the current state of the art.
+
+================================================================================
+TOPIC: When RAG Beats CAG -- Edge Cases and Empirical Limits
+================================================================================
+NOTE: This section deliberately contradicts some pro-CAG framing elsewhere
+in this document. Understanding both perspectives is required to answer
+nuanced comparison questions accurately.
+
+CAG is not universally superior. There are well-defined scenarios where RAG
+definitively outperforms CAG.
+
+Scenario 1: Knowledge base exceeds context window
+Any KB exceeding the model's context window cannot use CAG at all.
+- GPT-4 (128K tokens, ~96K words): Insufficient for most real-world KBs
+- Gemini 1.5 Pro (1M tokens, ~750K words): Still insufficient for Wikipedia,
+  legal corpora, or large codebases
+- RAG scales to billions of documents; CAG is fundamentally hardware-limited
+
+Scenario 2: Frequently updated content
+If the KB changes daily (news, stock prices, product catalogs):
+- CAG: Must reload and re-prefill entire KB on every update
+- RAG: Re-embeds only changed chunks, updates vector index incrementally
+- RAG operational cost is proportional to changed chunks, not total KB size
+
+Scenario 3: Precise factual retrieval from noisy context
+When the KB contains much irrelevant content relative to a specific query:
+- CAG forces the model to attend over all content including noise
+- RAG filtering narrows to the most relevant chunks
+- On single-hop factual QA benchmarks (TriviaQA, Natural Questions), RAG with
+  strong retrievers matches or exceeds CAG on models below 100K context length
+
+Scenario 4: Lost-in-the-Middle (see dedicated section)
+When relevant content falls in the middle of a long loaded context, RAG's
+structural advantage of always placing retrieved content at the top of a
+short prompt is decisive. Open-source models without specialized long-context
+training are particularly vulnerable.
+
+Scenario 5: Cost at scale without KV cache infrastructure
+Without prefix caching, CAG costs 10-30x more in input token costs per query.
+
+Scenario 6: Retrieval confidence as a signal
+RAG systems return similarity scores for retrieved chunks. A low score signals
+uncertain retrieval and can trigger fallbacks (CRAG, Self-RAG, abstention).
+CAG provides no such signal: the model may confabulate from irrelevant context
+without any external indication that the KB lacked the answer.
+
+Summary:
+  KB size exceeds context window:             RAG wins
+  Frequently updated content:                 RAG wins
+  Single-hop factual QA with large noisy KB:  RAG wins
+  Model without strong long-context tuning:   RAG often wins
+  Cost at scale without KV cache:             RAG wins
+  Multi-hop reasoning over small static KB:   CAG wins
+  Consistent answers without retrieval variance: CAG wins
+  Minimal architecture and ops complexity:    CAG wins
+  Queries requiring synthesis across all topics: CAG wins
+
+================================================================================
+TOPIC: Embedding Model Selection and MTEB Benchmarks
+================================================================================
+The quality of a RAG system is bounded by its embedding model. Selecting the
+right embedding model is as important as choosing the LLM or chunking strategy.
+
+MTEB (Massive Text Embedding Benchmark):
+The standard benchmark for text embedding models, covering 56 tasks across
+8 categories including retrieval, clustering, semantic similarity, and reranking.
+Key retrieval datasets: MSMARCO, BEIR, HotpotQA.
+
+Top embedding models (approximate rankings as of 2024-2025):
+all-MiniLM-L6-v2 (used in this project):
+  Dimensions: 384, Parameters: 22M, MTEB avg: ~56
+  Lightweight, fast, good for prototyping and small knowledge bases.
+
+BGE-large-en-v1.5:
+  Dimensions: 1024, Parameters: 335M, MTEB avg: ~64
+  Strong open-source option for production RAG.
+
+E5-large-instruct:
+  Dimensions: 1024, Parameters: 335M, MTEB avg: ~65
+  Task-specific prompting improves retrieval quality.
+
+text-embedding-3-large (OpenAI):
+  Dimensions: 3072, closed source, MTEB avg: ~65
+  High quality but requires OpenAI API.
+
+GTE-Qwen2-7B-instruct:
+  Dimensions: 3584, Parameters: 7B, MTEB avg: ~72
+  State of the art as of 2024, expensive to run.
+
+Bi-encoder vs Cross-encoder:
+Bi-encoder (all-MiniLM-L6-v2, BGE): Encodes query and documents separately.
+  Similarity via dot product. Fast, can pre-encode all documents offline.
+Cross-encoder: Processes query and document jointly. More accurate but slower.
+  Cannot pre-encode documents; used for reranking top-k bi-encoder results.
+
+Two-stage retrieval pipeline:
+  Query -> Bi-encoder -> Top-50 candidates -> Cross-encoder rerank -> Top-3 -> LLM
+This significantly improves RAG quality over pure bi-encoder retrieval.
+
+Relevance to CAG:
+CAG is completely immune to embedding quality since there is no retrieval step.
+This is a structural advantage: RAG answer quality is sensitive to the embedding
+model, while CAG quality depends only on the LLM. A RAG system with a weak
+embedding model on a task well-suited to CAG will reliably underperform CAG.
+
+================================================================================
+TOPIC: Multi-Hop Reasoning -- Where CAG and RAG Diverge Most
+================================================================================
+Multi-hop reasoning requires chaining information from two or more distinct
+sources to construct an answer. This is the scenario where CAG and RAG diverge
+most dramatically and consistently across benchmarks.
+
+Definition: A multi-hop question cannot be answered from any single text chunk.
+It requires either retrieving multiple chunks and synthesizing them (RAG approach)
+or having all information simultaneously available (CAG approach).
+
+Example multi-hop question:
+  "What tokenization algorithm does the model that introduced Grouped Query
+  Attention use, and how does that tokenization choice affect CAG's effective
+  context window capacity?"
+
+Answering requires chaining four pieces of information:
+1. LLaMA introduced GQA (from Attention Mechanisms and KV Cache topic)
+2. LLaMA uses BPE tokenization (from Tokenization topic)
+3. BPE produces approximately 4 characters per token (from Tokenization topic)
+4. CAG context capacity is measured in tokens, not words (from CAG topic)
+
+RAG failure modes on this question:
+- Single retrieval: Fetches the GQA chunk, misses tokenization entirely
+- Separate retrievals: May get GQA and BPE chunks but fail to connect them
+- Iterative RAG: Needs 3-4 rounds, each adding 200-500ms latency
+
+CAG advantage: All four pieces are simultaneously available in the full context.
+The LLM can freely attend across topic boundaries to build the complete answer.
+
+HotpotQA benchmark results (2-hop QA):
+- RAG with top-1 retrieval: ~38% Exact Match accuracy
+- RAG with top-5 retrieval: ~52% EM accuracy
+- RAG with chain-of-thought retrieval: ~67% EM accuracy
+- CAG over full document set (capable models): ~79% EM accuracy
+The gap narrows with advanced RAG techniques (RAPTOR, Self-RAG) but persists.
+
+Bridge vs Comparison multi-hop:
+Bridge: Answer to sub-question A is needed to find Answer B.
+  Example: "What nationality is the director of Film X?"
+  Step 1: Find director name. Step 2: Find director's nationality.
+
+Comparison: Two independent retrieval paths must be compared simultaneously.
+  Example: "Which has more parameters, GPT-3 or PaLM?"
+  Both must be retrieved and held in context simultaneously for comparison.
+
+CAG handles both bridge and comparison natively. RAG handles bridge better
+than comparison, since comparison requires two guaranteed successful retrievals
+plus a synthesis step that RAG's short-context prompt structure limits.
+
+================================================================================
+TOPIC: Faithfulness, Hallucination, and Groundedness -- CAG vs RAG
+================================================================================
+Both CAG and RAG aim to reduce hallucination by grounding answers in a source.
+However, they have structurally different failure modes that practitioners
+must understand before choosing between them.
+
+Faithfulness (RAGAS definition):
+Proportion of claims in the generated answer that are supported by the
+provided context:
+  Faithfulness = supported_claims / total_claims_in_answer
+
+This metric applies to both systems but is measured differently.
+For RAG: context = retrieved top-k chunks
+For CAG: context = full knowledge base
+
+CAG faithfulness profile:
+Advantage: All source material is available. The model cannot hallucinate due
+  to missing context if the information exists anywhere in the KB.
+Weakness 1: In very long contexts, the model may blend content from distant
+  sections in ways unfaithful to either (cross-contamination hallucination).
+Weakness 2: The lost-in-the-middle effect can cause the model to fill gaps
+  with parametric memory while appearing to reason from context.
+
+RAG faithfulness profile:
+Advantage: Short, focused context makes claims easy to verify against source.
+  Low similarity scores signal retrieval failure before generation occurs.
+Critical weakness: When the relevant chunk was NOT retrieved, the model
+  generates from parametric memory. This is the most dangerous failure mode
+  because neither the system nor the user can detect that retrieval failed.
+
+Faithfulness vs Groundedness:
+- Faithfulness: Is the answer supported by the context that was provided?
+- Groundedness: Is the answer accurate in the real world?
+These diverge when the KB itself contains errors. Both systems will faithfully
+reproduce errors in the source knowledge base; neither validates KB accuracy.
+
+Abstention behavior:
+CAG can legitimately signal "I don't have information about that" when the full
+KB has been processed and the answer is genuinely absent.
+RAG's abstention is ambiguous: it could mean the KB lacks the answer, OR that
+retrieval failed to surface relevant content that does exist in the KB.
+
+Citation and attribution:
+RAG natively supports citation with source title and similarity score per chunk.
+CAG can be prompted to cite section headings but cannot provide per-claim
+retrieval confidence signals.
+
+================================================================================
+TOPIC: Benchmark Evaluation Design for CAG vs RAG
+================================================================================
+Evaluating a CAG vs RAG system requires metrics that go beyond simple accuracy.
+This section describes the evaluation framework used in this benchmark project.
+
+LLM-as-judge dimensions (scored 1-5 per question):
+1. Correctness: Factual accuracy against known ground truth
+2. Completeness: Coverage of expected key concepts
+3. Coherence: Logical structure and clarity of explanation
+4. Groundedness: Specific and precise vs vague and generic
+
+RAGAS framework (the standard for RAG-system evaluation):
+- Context Recall: Was the relevant content successfully retrieved? (RAG only)
+- Context Precision: Were retrieved chunks actually relevant? (RAG only)
+- Faithfulness: Are answer claims supported by the provided context? (both)
+- Answer Relevancy: Does the answer address the actual question? (both)
+
+Question categories and expected outcomes in this benchmark:
+Factual questions (e.g., "What is RLHF?"): Single topic.
+  Both systems expected to score similarly. Tests basic retrieval and context use.
+
+Comparison questions (e.g., "Compare CAG vs RAG weaknesses"): Multi-section.
+  CAG expected to show a slight advantage from fuller context availability.
+
+Technical questions (e.g., "What is the scaled dot-product attention formula?"):
+  Requires precise numerical or definitional content.
+  RAG may win if the specific section is retrieved with high precision.
+
+Multi-hop questions (e.g., "How does tokenization affect CAG context capacity?"):
+  Requires crossing topic boundaries. CAG advantage is most pronounced here.
+
+Reasoning questions (e.g., "Which architecture suits a medical RAG generator?"):
+  Applied problem-solving spanning multiple topics. CAG advantage for scenarios
+  requiring synthesis from several knowledge base sections simultaneously.
+
+Aggregate metrics:
+- avg_judge_score: Mean total score across all questions (higher = better quality)
+- avg_latency_seconds: Mean per-query time (lower = faster)
+- wins: Number of questions where one system scored strictly higher
+- ties: Questions with equal judge scores (common when both systems perform well)
+
+Known limitations of this evaluation:
+1. LLM-as-judge has verbosity bias: longer answers tend to score higher
+2. Ten questions is too few for statistical significance: results are directional
+3. Judge model and generation model are the same provider: possible self-bias
+4. Knowledge base was designed to be answerable: out-of-KB questions test
+   the systems differently and are not covered here
+
+================================================================================

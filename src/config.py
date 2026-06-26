@@ -7,7 +7,7 @@ load_dotenv()
 
 # Gemini — text generation (free tier: 1,000,000 TPM, 1,500 req/day)
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 # Cloudflare Workers AI — embeddings only
